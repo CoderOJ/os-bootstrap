@@ -1,16 +1,29 @@
 #cloud-config
 
+hostname: cscg-test
+
 # Set locale and timezone
 locale: en_US.UTF-8
 timezone: Asia/Shanghai
 
+# Pre-config packages install
+bootcmd:
+  - apt install -y -o Dpkg::Options::="--force-confnew" btrfs-progs openssh-client openssh-server netplan
+
+# Packages
+package_update: false
+package_upgrade: false
+packages:
+  - vim
+  - fish
+
 # Configure users
 users:
-  - name: debian
+  - name: cscg
     groups: sudo
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
-    lock_passwd: true
+    passwd: "$6$A8E5Ol1BI/5MK/q0$kGTLlV72S3bq3xRI6WTfMrg73KTg.7x.dlWsfEwgmNMjSIwHSsvGvYc5vOR7F/vVMr4Zf9hO/x.Yyil7lQ5ii0"
     # Add your SSH public key here for secure access
     # ssh_authorized_keys:
     #   - ssh-rsa AAAA...
