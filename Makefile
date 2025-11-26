@@ -94,6 +94,11 @@ target/bootstrap: target/subvolume
 	${MAKE} util/mount-kernelfs
 	chroot ./mnt apt install -y linux-image-amd64 cloud-init
 
+	# Configure cloud-init nocloud datasource
+	mkdir -p ./mnt/var/lib/cloud/seed/nocloud
+	cp cloud-init/nocloud/meta-data ./mnt/var/lib/cloud/seed/nocloud/meta-data
+	cp cloud-init/nocloud/user-data ./mnt/var/lib/cloud/seed/nocloud/user-data
+
 	@touch $@
 
 target/systemd-boot: target/format
