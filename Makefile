@@ -92,6 +92,9 @@ target/subvolume: target/format
 target/bootstrap: target/subvolume
 	debootstrap --arch=amd64 trixie ./mnt https://mirrors.tuna.tsinghua.edu.cn/debian/
 
+	# Update apt sources.list from bootstrap to full list
+	install -m 644 apt/sources.list ./mnt/etc/apt/sources.list
+
 	${MAKE} util/mount-kernelfs
 	chroot ./mnt apt install -y -o Dpkg::Options::="--force-confnew" linux-image-amd64 cloud-init btrfs-progs openssh-client openssh-server locales
 
