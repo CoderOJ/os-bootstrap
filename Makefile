@@ -96,6 +96,7 @@ target/bootstrap: target/subvolume
 	install -m 644 apt/sources.list ./mnt/etc/apt/sources.list
 
 	${MAKE} util/mount-kernelfs
+	chroot ./mnt apt update
 	chroot ./mnt apt install -y -o Dpkg::Options::="--force-confnew" linux-image-amd64 cloud-init btrfs-progs openssh-client openssh-server locales
 
 
