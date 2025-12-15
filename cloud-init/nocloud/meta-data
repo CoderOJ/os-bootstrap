@@ -1,0 +1,2 @@
+instance-id: debian-bootstrap
+local-hostname: debian

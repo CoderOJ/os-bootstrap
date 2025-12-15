@@ -3,6 +3,7 @@ clean:
 	${MAKE} util/unmount-kernelfs
 	${MAKE} util/unmount
 	rm -rf mnt
+	rm -rf qemu-run
 
 util/mount:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
@@ -92,7 +93,14 @@ target/bootstrap: target/subvolume
 	debootstrap --arch=amd64 trixie ./mnt https://mirrors.tuna.tsinghua.edu.cn/debian/
 
 	${MAKE} util/mount-kernelfs
-	chroot ./mnt apt install -y linux-image-amd64 cloud-init
+	chroot ./mnt apt install -y -o Dpkg::Options::="--force-confnew" linux-image-amd64 cloud-init btrfs-progs openssh-client openssh-server locales
+
+
+	# Configure cloud-init nocloud datasource
+	mkdir -p ./mnt/var/lib/cloud/seed/nocloud
+	cp cloud-init/nocloud/meta-data ./mnt/var/lib/cloud/seed/nocloud/meta-data
+	cp cloud-init/nocloud/user-data ./mnt/var/lib/cloud/seed/nocloud/user-data
+	cp cloud-init/99-local.cfg 	./mnt/etc/cloud/cloud.cfg.d/99-local.cfg
 
 	@touch $@
 
@@ -109,6 +117,7 @@ test/boot: target/dependency
 	${MAKE} util/unmount
 	${MAKE} util/unmount-kernelfs
 
+	mkdir -p qemu-run
 	cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
 	qemu-system-x86_64 -nographic -m 4g -smp 8 \
 		  -drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
