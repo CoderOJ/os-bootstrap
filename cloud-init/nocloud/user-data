@@ -12,6 +12,7 @@ package_upgrade: false
 packages:
   - vim
   - fish
+  - netplan.io
   - systemd-resolved
 
 # Configure users
@@ -39,8 +40,32 @@ package_upgrade: false
 # Final message
 final_message: "Cloud-init completed after $UPTIME seconds"
 
+# Write netplan configuration
+write_files:
+  - path: /etc/netplan/01-netcfg.yaml
+    content: |
+      network:
+        version: 2
+        renderer: networkd
+        ethernets:
+          enp5s0f0np0:
+            link-local: []
+          enp5s0f1np1:
+            link-local: []
+        bonds:
+          bond0:
+            interfaces:
+              - enp5s0f0np0
+              - enp5s0f1np1
+            parameters:
+              mode: 802.3ad
+              lacp-rate: fast
+              transmit-hash-policy: layer3+4
+            dhcp4: true
+
 # Configure network using systemd-networkd
 runcmd:
   - systemctl disable networking || true
   - systemctl enable --now systemd-networkd
   - systemctl enable --now systemd-resolved
+  - netplan apply
