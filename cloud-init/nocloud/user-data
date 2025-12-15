@@ -6,16 +6,13 @@ hostname: cscg-test
 locale: en_US.UTF-8
 timezone: Asia/Shanghai
 
-# Pre-config packages install
-bootcmd:
-  - apt install -y -o Dpkg::Options::="--force-confnew" btrfs-progs openssh-client openssh-server netplan
-
 # Packages
 package_update: false
 package_upgrade: false
 packages:
   - vim
   - fish
+  - netplan.io
 
 # Configure users
 users:
@@ -23,10 +20,14 @@ users:
     groups: sudo
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
-    passwd: "$6$A8E5Ol1BI/5MK/q0$kGTLlV72S3bq3xRI6WTfMrg73KTg.7x.dlWsfEwgmNMjSIwHSsvGvYc5vOR7F/vVMr4Zf9hO/x.Yyil7lQ5ii0"
+    lock_passwd: false
+    passwd: "$6$WNl4ux61UxjDajlg$WY1TbtyED8ed7ZnRWofp09oNJsaaRBdWhDKDb.P.qRqz5gE1zqNG929RC99vT6Ip.Fuhfbn/cpNQEW4zHOoZ00"
     # Add your SSH public key here for secure access
     # ssh_authorized_keys:
     #   - ssh-rsa AAAA...
+
+# update /etc/hosts
+manage_etc_hosts: true
 
 # Disable SSH password authentication for security
 ssh_pwauth: false

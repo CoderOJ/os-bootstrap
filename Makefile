@@ -93,7 +93,8 @@ target/bootstrap: target/subvolume
 	debootstrap --arch=amd64 trixie ./mnt https://mirrors.tuna.tsinghua.edu.cn/debian/
 
 	${MAKE} util/mount-kernelfs
-	chroot ./mnt apt install -y linux-image-amd64 cloud-init
+	chroot ./mnt apt install -y -o Dpkg::Options::="--force-confnew" linux-image-amd64 cloud-init btrfs-progs openssh-client openssh-server locales
+
 
 	# Configure cloud-init nocloud datasource
 	mkdir -p ./mnt/var/lib/cloud/seed/nocloud
