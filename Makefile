@@ -100,6 +100,7 @@ target/bootstrap: target/subvolume
 	mkdir -p ./mnt/var/lib/cloud/seed/nocloud
 	cp cloud-init/nocloud/meta-data ./mnt/var/lib/cloud/seed/nocloud/meta-data
 	cp cloud-init/nocloud/user-data ./mnt/var/lib/cloud/seed/nocloud/user-data
+	cp cloud-init/nocloud/network-config ./mnt/var/lib/cloud/seed/nocloud/network-config
 	cp cloud-init/99-local.cfg 	./mnt/etc/cloud/cloud.cfg.d/99-local.cfg
 
 	@touch $@

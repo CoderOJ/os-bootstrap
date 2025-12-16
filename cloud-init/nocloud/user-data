@@ -13,6 +13,7 @@ packages:
   - vim
   - fish
   - netplan.io
+  - systemd-resolved
 
 # Configure users
 users:
@@ -38,3 +39,9 @@ package_upgrade: false
 
 # Final message
 final_message: "Cloud-init completed after $UPTIME seconds"
+
+# Configure network using systemd-networkd
+runcmd:
+  - systemctl disable networking || true
+  - systemctl enable --now systemd-networkd
+  - systemctl enable --now systemd-resolved
