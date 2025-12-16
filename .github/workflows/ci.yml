@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y gdisk btrfs-progs parted dosfstools debootstrap systemd-boot qemu-system-x86 ovmf
+        sudo apt-get install -y gdisk btrfs-progs parted dosfstools debootstrap systemd-boot qemu-system-x86-64 ovmf
         mkdir -p target
         touch target/dependency
     
@@ -196,9 +196,27 @@ jobs:
     
     - name: Boot with QEMU/KVM and run tests
       run: |
+        # Detect OVMF firmware files
+        if [ -f /usr/share/OVMF/OVMF_CODE_4M.fd ]; then
+          OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.fd
+          OVMF_VARS=/usr/share/OVMF/OVMF_VARS_4M.fd
+        elif [ -f /usr/share/OVMF/OVMF_CODE.fd ]; then
+          OVMF_CODE=/usr/share/OVMF/OVMF_CODE.fd
+          OVMF_VARS=/usr/share/OVMF/OVMF_VARS.fd
+        elif [ -f /usr/share/qemu/OVMF_CODE.fd ]; then
+          OVMF_CODE=/usr/share/qemu/OVMF_CODE.fd
+          OVMF_VARS=/usr/share/qemu/OVMF_VARS.fd
+        else
+          echo "Error: OVMF firmware files not found"
+          exit 1
+        fi
+        
+        echo "Using OVMF_CODE: $OVMF_CODE"
+        echo "Using OVMF_VARS: $OVMF_VARS"
+        
         # Copy OVMF variables
         mkdir -p qemu-run
-        cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
+        cp "$OVMF_VARS" ./qemu-run/OVMF_VARS.fd
         
         # Start QEMU in background with SSH port forwarding
         sudo qemu-system-x86_64 \
@@ -206,8 +224,8 @@ jobs:
           -nographic \
           -m 2g \
           -smp 2 \
-          -drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-          -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
+          -drive if=pflash,format=raw,readonly,file="$OVMF_CODE" \
+          -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS.fd \
           -drive file=${{ env.LOOP_DEVICE }},format=raw,if=none,id=disk0,cache=none \
           -device virtio-blk-pci,drive=disk0 \
           -netdev user,id=net0,hostfwd=tcp::2222-:22 \
