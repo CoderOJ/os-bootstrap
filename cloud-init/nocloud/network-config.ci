@@ -1,0 +1,11 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    # Simple DHCP configuration for all ethernet interfaces
+    # This will work in both VM and physical environments
+    all:
+      match:
+        name: "e*"
+      dhcp4: true
+      dhcp6: false

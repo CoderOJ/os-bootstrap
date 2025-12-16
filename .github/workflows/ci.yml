@@ -1,0 +1,306 @@
+name: CI/CD - OS Bootstrap
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Free up disk space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo df -h
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gdisk btrfs-progs parted dosfstools debootstrap systemd-boot qemu-system-x86 ovmf
+        mkdir -p target
+        touch target/dependency
+    
+    - name: Create loopback device
+      run: |
+        # Create a 10GB disk image
+        sudo dd if=/dev/zero of=/tmp/disk.img bs=1M count=10240 status=progress
+        
+        # Setup loopback device
+        sudo losetup -fP /tmp/disk.img
+        export LOOP_DEVICE=$(sudo losetup -j /tmp/disk.img | cut -d: -f1)
+        echo "LOOP_DEVICE=$LOOP_DEVICE" >> $GITHUB_ENV
+        echo "Created loopback device: $LOOP_DEVICE"
+        
+        # Show device info
+        sudo lsblk $LOOP_DEVICE
+    
+    - name: Partition and format disk
+      run: |
+        # Partition the disk (non-interactive)
+        sudo sgdisk -Z "${{ env.LOOP_DEVICE }}"
+        sudo sgdisk -o "${{ env.LOOP_DEVICE }}"
+        sudo sgdisk -n 1:0:+1G -t 1:EF00 -c 1:"EFI System" "${{ env.LOOP_DEVICE }}"
+        sudo sgdisk -n 2:0:0 -t 2:8300 -c 2:"Linux root (btrfs)" "${{ env.LOOP_DEVICE }}"
+        sudo partprobe "${{ env.LOOP_DEVICE }}"
+        
+        # Wait for partition devices to appear
+        sleep 2
+        sudo partprobe "${{ env.LOOP_DEVICE }}"
+        sleep 2
+        
+        # Format partitions
+        sudo mkfs.fat -F32 "${LOOP_DEVICE}p1"
+        sudo mkfs.btrfs -f -L "rootfs" "${LOOP_DEVICE}p2"
+        
+        echo "Partitions created:"
+        sudo lsblk "${{ env.LOOP_DEVICE }}"
+        
+        touch target/partition-disk
+        touch target/format
+    
+    - name: Create mount points and subvolumes
+      run: |
+        # Mount root partition
+        mkdir -p ./mnt
+        sudo mount "${LOOP_DEVICE}p2" ./mnt
+        
+        # Mount boot partition
+        mkdir -p ./mnt/boot
+        sudo mount "${LOOP_DEVICE}p1" ./mnt/boot
+        
+        # Create btrfs subvolumes
+        sudo btrfs su create mnt/home
+        sudo btrfs su create mnt/var
+        sudo btrfs su create mnt/var/cache
+        sudo btrfs su create mnt/opt
+        sudo chattr +C mnt/var/cache
+        
+        touch target/subvolume
+    
+    - name: Bootstrap Debian system
+      run: |
+        # Run debootstrap
+        sudo debootstrap --arch=amd64 trixie ./mnt https://mirrors.tuna.tsinghua.edu.cn/debian/
+        
+        # Mount kernel filesystems
+        sudo mount --bind /dev  ./mnt/dev
+        sudo mount --bind /proc ./mnt/proc
+        sudo mount --bind /sys  ./mnt/sys
+        
+        # Install kernel and necessary packages
+        sudo chroot ./mnt apt install -y -o Dpkg::Options::="--force-confnew" \
+          linux-image-amd64 cloud-init btrfs-progs openssh-client openssh-server locales
+        
+        # Configure cloud-init
+        sudo mkdir -p ./mnt/var/lib/cloud/seed/nocloud
+        sudo cp cloud-init/nocloud/meta-data ./mnt/var/lib/cloud/seed/nocloud/meta-data
+        sudo cp cloud-init/nocloud/user-data ./mnt/var/lib/cloud/seed/nocloud/user-data
+        # Use CI-specific network config if available, otherwise use default
+        if [ -f cloud-init/nocloud/network-config.ci ]; then
+          sudo cp cloud-init/nocloud/network-config.ci ./mnt/var/lib/cloud/seed/nocloud/network-config
+        else
+          sudo cp cloud-init/nocloud/network-config ./mnt/var/lib/cloud/seed/nocloud/network-config
+        fi
+        sudo cp cloud-init/99-local.cfg ./mnt/etc/cloud/cloud.cfg.d/99-local.cfg
+        
+        touch target/bootstrap
+    
+    - name: Install systemd-boot
+      run: |
+        # Install bootloader
+        sudo bootctl --path=$(realpath ./mnt/boot) install
+        sudo cp systemd-boot/loader/loader.conf mnt/boot/loader/loader.conf
+        sudo bash systemd-boot/loader/entries/debian.conf.sh > /tmp/debian.conf
+        sudo cp /tmp/debian.conf mnt/boot/loader/entries/debian.conf
+        
+        touch target/systemd-boot
+    
+    - name: Configure SSH for cscg user
+      run: |
+        # Generate SSH key for CI testing
+        ssh-keygen -t ed25519 -f ~/.ssh/ci_test_key -N "" -C "ci-test@github-actions"
+        
+        # Add SSH key to authorized_keys for cscg user
+        sudo mkdir -p ./mnt/home/cscg/.ssh
+        sudo cp ~/.ssh/ci_test_key.pub ./mnt/home/cscg/.ssh/authorized_keys
+        sudo chroot ./mnt chown -R 1000:1000 /home/cscg/.ssh
+        sudo chroot ./mnt chmod 700 /home/cscg/.ssh
+        sudo chroot ./mnt chmod 600 /home/cscg/.ssh/authorized_keys
+        
+        # Enable password authentication for fallback (cloud-init sets ssh_pwauth: false)
+        # We'll rely on the key we just added
+        echo "SSH key configured for cscg user"
+        
+        # Save the private key location
+        echo "SSH_KEY_PATH=$HOME/.ssh/ci_test_key" >> $GITHUB_ENV
+    
+    - name: Create test script
+      run: |
+        # Create a test script that will be run inside the VM
+        cat > test-script.sh << 'EOF'
+        #!/bin/bash
+        set -e
+        
+        echo "=== System Test Script ==="
+        echo "Hostname: $(hostname)"
+        echo "Uptime: $(uptime)"
+        echo ""
+        
+        echo "=== Testing disk mounts ==="
+        df -h | grep -E '(Filesystem|/dev/vda)'
+        echo ""
+        
+        echo "=== Testing btrfs subvolumes ==="
+        sudo btrfs subvolume list /
+        echo ""
+        
+        echo "=== Testing user configuration ==="
+        whoami
+        id
+        echo ""
+        
+        echo "=== Testing network configuration ==="
+        ip addr show
+        echo ""
+        
+        echo "=== Testing systemd services ==="
+        systemctl is-active systemd-networkd
+        systemctl is-active sshd || systemctl is-active ssh
+        echo ""
+        
+        echo "=== All tests passed! ==="
+        EOF
+        
+        chmod +x test-script.sh
+        sudo cp test-script.sh ./mnt/home/cscg/test-script.sh
+        sudo chroot ./mnt chown 1000:1000 /home/cscg/test-script.sh
+    
+    - name: Unmount filesystems
+      run: |
+        sudo umount ./mnt/dev  || true
+        sudo umount ./mnt/proc || true
+        sudo umount ./mnt/sys  || true
+        sudo umount ./mnt/boot || true
+        sudo umount ./mnt      || true
+        sync
+    
+    - name: Boot with QEMU/KVM and run tests
+      run: |
+        # Copy OVMF variables
+        mkdir -p qemu-run
+        cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
+        
+        # Start QEMU in background with SSH port forwarding
+        sudo qemu-system-x86_64 \
+          -enable-kvm \
+          -nographic \
+          -m 2g \
+          -smp 2 \
+          -drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+          -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
+          -drive file=${{ env.LOOP_DEVICE }},format=raw,if=none,id=disk0,cache=none \
+          -device virtio-blk-pci,drive=disk0 \
+          -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+          -device virtio-net-pci,netdev=net0 \
+          -boot order=c \
+          -serial mon:stdio \
+          > qemu-output.log 2>&1 &
+        
+        QEMU_PID=$!
+        echo "QEMU started with PID: $QEMU_PID"
+        
+        # Wait for system to boot (cloud-init takes time)
+        echo "Waiting for system to boot and cloud-init to complete..."
+        sleep 120
+        
+        # Try to connect via SSH
+        echo "Attempting SSH connection to cscg user..."
+        MAX_ATTEMPTS=10
+        ATTEMPT=0
+        
+        while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+          if ssh -o StrictHostKeyChecking=no \
+                 -o UserKnownHostsFile=/dev/null \
+                 -o ConnectTimeout=10 \
+                 -i ${{ env.SSH_KEY_PATH }} \
+                 -p 2222 \
+                 cscg@localhost "echo 'SSH connection successful'"; then
+            echo "SSH connection established!"
+            break
+          fi
+          
+          ATTEMPT=$((ATTEMPT + 1))
+          echo "Attempt $ATTEMPT failed, retrying in 15 seconds..."
+          sleep 15
+        done
+        
+        if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+          echo "Failed to establish SSH connection after $MAX_ATTEMPTS attempts"
+          echo "=== QEMU Output ==="
+          cat qemu-output.log
+          sudo kill $QEMU_PID || true
+          exit 1
+        fi
+        
+        # Run the test script
+        echo "Running test script on the VM..."
+        ssh -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -i ${{ env.SSH_KEY_PATH }} \
+            -p 2222 \
+            cscg@localhost "bash /home/cscg/test-script.sh"
+        
+        # Shutdown the VM gracefully
+        echo "Shutting down VM..."
+        ssh -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            -i ${{ env.SSH_KEY_PATH }} \
+            -p 2222 \
+            cscg@localhost "sudo poweroff" || true
+        
+        # Wait for QEMU to exit
+        sleep 10
+        sudo kill $QEMU_PID 2>/dev/null || true
+        
+        echo "=== Test completed successfully! ==="
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        # Kill any remaining QEMU processes
+        sudo pkill -f qemu-system-x86_64 || true
+        
+        # Unmount any remaining mounts
+        sudo umount ./mnt/dev  2>/dev/null || true
+        sudo umount ./mnt/proc 2>/dev/null || true
+        sudo umount ./mnt/sys  2>/dev/null || true
+        sudo umount ./mnt/boot 2>/dev/null || true
+        sudo umount ./mnt      2>/dev/null || true
+        
+        # Detach loopback device
+        if [ -n "${{ env.LOOP_DEVICE }}" ]; then
+          sudo losetup -d "${{ env.LOOP_DEVICE }}" || true
+        fi
+        
+        # Remove disk image
+        sudo rm -f /tmp/disk.img
+        
+        echo "Cleanup completed"
+    
+    - name: Upload QEMU output on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: qemu-output
+        path: qemu-output.log
+        retention-days: 7

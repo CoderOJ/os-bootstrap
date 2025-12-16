@@ -2,3 +2,7 @@ mnt
 target
 qemu-run
 *.swp
+qemu-output.log
+/tmp/disk.img
+*.img
+.ssh/ci_test_key*
