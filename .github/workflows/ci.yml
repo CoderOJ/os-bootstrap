@@ -2,9 +2,9 @@ name: CI/CD - OS Bootstrap
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ debian ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ debian ]
   workflow_dispatch:
 
 jobs:
@@ -18,19 +18,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
     
-    - name: Free up disk space
-      run: |
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /opt/ghc
-        sudo df -h
-    
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y gdisk btrfs-progs parted dosfstools debootstrap systemd-boot qemu-system-x86-64 ovmf
-        mkdir -p target
-        touch target/dependency
+        sudo mkdir -p target
+        sudo touch target/dependency
     
     - name: Create loopback device
       run: |
@@ -48,152 +41,27 @@ jobs:
     
     - name: Partition and format disk
       run: |
-        # Partition the disk (non-interactive)
-        sudo sgdisk -Z "${{ env.LOOP_DEVICE }}"
-        sudo sgdisk -o "${{ env.LOOP_DEVICE }}"
-        sudo sgdisk -n 1:0:+1G -t 1:EF00 -c 1:"EFI System" "${{ env.LOOP_DEVICE }}"
-        sudo sgdisk -n 2:0:0 -t 2:8300 -c 2:"Linux root (btrfs)" "${{ env.LOOP_DEVICE }}"
-        sudo partprobe "${{ env.LOOP_DEVICE }}"
-        
-        # Wait for partition devices to appear
-        sleep 2
-        sudo partprobe "${{ env.LOOP_DEVICE }}"
-        sleep 2
-        
-        # Format partitions
-        sudo mkfs.fat -F32 "${LOOP_DEVICE}p1"
-        sudo mkfs.btrfs -f -L "rootfs" "${LOOP_DEVICE}p2"
-        
-        echo "Partitions created:"
-        sudo lsblk "${{ env.LOOP_DEVICE }}"
-        
-        touch target/partition-disk
-        touch target/format
+        sudo make target/partition-disk-ci DISK=${{ env.LOOP_DEVICE }}
+        sudo make target/format-ci DISK=${{ env.LOOP_DEVICE }}
     
-    - name: Create mount points and subvolumes
+    - name: Create subvolumes
       run: |
-        # Mount root partition
-        mkdir -p ./mnt
-        sudo mount "${LOOP_DEVICE}p2" ./mnt
-        
-        # Mount boot partition
-        mkdir -p ./mnt/boot
-        sudo mount "${LOOP_DEVICE}p1" ./mnt/boot
-        
-        # Create btrfs subvolumes
-        sudo btrfs su create mnt/home
-        sudo btrfs su create mnt/var
-        sudo btrfs su create mnt/var/cache
-        sudo btrfs su create mnt/opt
-        sudo chattr +C mnt/var/cache
-        
-        touch target/subvolume
+        sudo make target/subvolume DISK=${{ env.LOOP_DEVICE }}
     
-    - name: Bootstrap Debian system
+    - name: Generate SSH key for testing
       run: |
-        # Run debootstrap
-        sudo debootstrap --arch=amd64 trixie ./mnt https://mirrors.tuna.tsinghua.edu.cn/debian/
-        
-        # Mount kernel filesystems
-        sudo mount --bind /dev  ./mnt/dev
-        sudo mount --bind /proc ./mnt/proc
-        sudo mount --bind /sys  ./mnt/sys
-        
-        # Install kernel and necessary packages
-        sudo chroot ./mnt apt install -y -o Dpkg::Options::="--force-confnew" \
-          linux-image-amd64 cloud-init btrfs-progs openssh-client openssh-server locales
-        
-        # Configure cloud-init
-        sudo mkdir -p ./mnt/var/lib/cloud/seed/nocloud
-        sudo cp cloud-init/nocloud/meta-data ./mnt/var/lib/cloud/seed/nocloud/meta-data
-        sudo cp cloud-init/nocloud/user-data ./mnt/var/lib/cloud/seed/nocloud/user-data
-        # Use CI-specific network config if available, otherwise use default
-        if [ -f cloud-init/nocloud/network-config.ci ]; then
-          sudo cp cloud-init/nocloud/network-config.ci ./mnt/var/lib/cloud/seed/nocloud/network-config
-        else
-          sudo cp cloud-init/nocloud/network-config ./mnt/var/lib/cloud/seed/nocloud/network-config
-        fi
-        sudo cp cloud-init/99-local.cfg ./mnt/etc/cloud/cloud.cfg.d/99-local.cfg
-        
-        touch target/bootstrap
-    
-    - name: Install systemd-boot
-      run: |
-        # Install bootloader
-        sudo bootctl --path=$(realpath ./mnt/boot) install
-        sudo cp systemd-boot/loader/loader.conf mnt/boot/loader/loader.conf
-        sudo bash systemd-boot/loader/entries/debian.conf.sh > /tmp/debian.conf
-        sudo cp /tmp/debian.conf mnt/boot/loader/entries/debian.conf
-        
-        touch target/systemd-boot
-    
-    - name: Configure SSH for cscg user
-      run: |
-        # Generate SSH key for CI testing
         ssh-keygen -t ed25519 -f ~/.ssh/ci_test_key -N "" -C "ci-test@github-actions"
-        
-        # Add SSH key to authorized_keys for cscg user
-        sudo mkdir -p ./mnt/home/cscg/.ssh
-        sudo cp ~/.ssh/ci_test_key.pub ./mnt/home/cscg/.ssh/authorized_keys
-        sudo chroot ./mnt chown -R 1000:1000 /home/cscg/.ssh
-        sudo chroot ./mnt chmod 700 /home/cscg/.ssh
-        sudo chroot ./mnt chmod 600 /home/cscg/.ssh/authorized_keys
-        
-        # Enable password authentication for fallback (cloud-init sets ssh_pwauth: false)
-        # We'll rely on the key we just added
-        echo "SSH key configured for cscg user"
-        
-        # Save the private key location
+        echo "SSH_PUB_KEY=$HOME/.ssh/ci_test_key.pub" >> $GITHUB_ENV
         echo "SSH_KEY_PATH=$HOME/.ssh/ci_test_key" >> $GITHUB_ENV
     
-    - name: Create test script
+    - name: Bootstrap and configure system
       run: |
-        # Create a test script that will be run inside the VM
-        cat > test-script.sh << 'EOF'
-        #!/bin/bash
-        set -e
-        
-        echo "=== System Test Script ==="
-        echo "Hostname: $(hostname)"
-        echo "Uptime: $(uptime)"
-        echo ""
-        
-        echo "=== Testing disk mounts ==="
-        df -h | grep -E '(Filesystem|/dev/vda)'
-        echo ""
-        
-        echo "=== Testing btrfs subvolumes ==="
-        sudo btrfs subvolume list /
-        echo ""
-        
-        echo "=== Testing user configuration ==="
-        whoami
-        id
-        echo ""
-        
-        echo "=== Testing network configuration ==="
-        ip addr show
-        echo ""
-        
-        echo "=== Testing systemd services ==="
-        systemctl is-active systemd-networkd
-        systemctl is-active sshd || systemctl is-active ssh
-        echo ""
-        
-        echo "=== All tests passed! ==="
-        EOF
-        
-        chmod +x test-script.sh
-        sudo cp test-script.sh ./mnt/home/cscg/test-script.sh
-        sudo chroot ./mnt chown 1000:1000 /home/cscg/test-script.sh
+        sudo make target/all-ci DISK=${{ env.LOOP_DEVICE }} SSH_PUB_KEY=${{ env.SSH_PUB_KEY }}
     
     - name: Unmount filesystems
       run: |
-        sudo umount ./mnt/dev  || true
-        sudo umount ./mnt/proc || true
-        sudo umount ./mnt/sys  || true
-        sudo umount ./mnt/boot || true
-        sudo umount ./mnt      || true
+        sudo make util/unmount-kernelfs
+        sudo make util/unmount
         sync
     
     - name: Boot with QEMU/KVM and run tests
@@ -269,7 +137,7 @@ jobs:
           echo "Failed to establish SSH connection after $MAX_ATTEMPTS attempts"
           echo "=== QEMU Output ==="
           cat qemu-output.log
-          sudo kill $QEMU_PID || true
+          sudo kill ${{ env.QEMU_PID }} || true
           exit 1
         fi
         
@@ -312,11 +180,8 @@ jobs:
         fi
         
         # Unmount any remaining mounts
-        sudo umount ./mnt/dev  2>/dev/null || true
-        sudo umount ./mnt/proc 2>/dev/null || true
-        sudo umount ./mnt/sys  2>/dev/null || true
-        sudo umount ./mnt/boot 2>/dev/null || true
-        sudo umount ./mnt      2>/dev/null || true
+        sudo make util/unmount-kernelfs || true
+        sudo make util/unmount || true
         
         # Detach loopback device
         if [ -n "${{ env.LOOP_DEVICE }}" ]; then
