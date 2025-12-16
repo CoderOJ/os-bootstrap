@@ -217,6 +217,7 @@ jobs:
           > qemu-output.log 2>&1 &
         
         QEMU_PID=$!
+        echo "QEMU_PID=$QEMU_PID" >> $GITHUB_ENV
         echo "QEMU started with PID: $QEMU_PID"
         
         # Wait for system to boot (cloud-init takes time)
@@ -270,15 +271,25 @@ jobs:
         
         # Wait for QEMU to exit
         sleep 10
-        sudo kill $QEMU_PID 2>/dev/null || true
+        sudo kill ${{ env.QEMU_PID }} 2>/dev/null || true
         
         echo "=== Test completed successfully! ==="
     
     - name: Cleanup
       if: always()
       run: |
-        # Kill any remaining QEMU processes
-        sudo pkill -f qemu-system-x86_64 || true
+        # Kill QEMU process if it's still running
+        if [ -n "${{ env.QEMU_PID }}" ]; then
+          sudo kill ${{ env.QEMU_PID }} 2>/dev/null || true
+        fi
+        
+        # Also check for any other QEMU processes and kill them by PID
+        QEMU_PIDS=$(pgrep qemu-system-x86_64 || true)
+        if [ -n "$QEMU_PIDS" ]; then
+          for pid in $QEMU_PIDS; do
+            sudo kill $pid 2>/dev/null || true
+          done
+        fi
         
         # Unmount any remaining mounts
         sudo umount ./mnt/dev  2>/dev/null || true
