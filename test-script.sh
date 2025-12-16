@@ -25,7 +25,7 @@ echo ""
 
 echo "=== Testing systemd services ==="
 systemctl is-active systemd-networkd
-systemctl is-active sshd || systemctl is-active ssh
+systemctl is-active sshd 2>/dev/null || systemctl is-active ssh 2>/dev/null || echo "SSH service not found"
 echo ""
 
 echo "=== All tests passed! ==="

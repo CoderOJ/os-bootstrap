@@ -56,22 +56,22 @@ target/partition-disk: target/dependency
 target/partition-disk-ci: target/dependency
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
 
-	# 1. 清空磁盘分区表
+	# 1. Clear disk partition table
 	sgdisk -Z "${DISK}"
-	# 2. 创建 GPT
+	# 2. Create GPT
 	sgdisk -o "${DISK}"
-	# 3. 创建 EFI 分区（FAT32）512MB
+	# 3. Create EFI partition (FAT32) 1GB
 	sgdisk -n 1:0:+1G -t 1:EF00 -c 1:"EFI System" "${DISK}"
-	# 4. 创建 Btrfs 根分区（剩余全部）
+	# 4. Create Btrfs root partition (remaining space)
 	sgdisk -n 2:0:0 -t 2:8300 -c 2:"Linux root (btrfs)" "${DISK}"
-	# 重新加载分区表
+	# Reload partition table
 	partprobe "${DISK}"
 	# Wait for partitions to appear
 	sleep 2
 	partprobe "${DISK}"
 	sleep 2
 
-	@touch target/partition-disk
+	@touch $@
 
 target/format-efi:
 	@test "${PART_EFI}" != "" || (echo "Specify PART_EFI"; exit 1)
