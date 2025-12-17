@@ -39,24 +39,17 @@ jobs:
         # Show device info
         sudo lsblk $LOOP_DEVICE
     
-    - name: Partition and format disk
-      run: |
-        sudo make target/partition-disk-ci DISK=${{ env.LOOP_DEVICE }}
-        sudo make target/format-ci DISK=${{ env.LOOP_DEVICE }}
-    
-    - name: Create subvolumes
-      run: |
-        sudo make target/subvolume DISK=${{ env.LOOP_DEVICE }}
-    
     - name: Generate SSH key for testing
       run: |
         ssh-keygen -t ed25519 -f ~/.ssh/ci_test_key -N "" -C "ci-test@github-actions"
         echo "SSH_PUB_KEY=$HOME/.ssh/ci_test_key.pub" >> $GITHUB_ENV
         echo "SSH_KEY_PATH=$HOME/.ssh/ci_test_key" >> $GITHUB_ENV
     
-    - name: Bootstrap and configure system
+    - name: Build system with Makefile
       run: |
-        sudo make target/all-ci DISK=${{ env.LOOP_DEVICE }} SSH_PUB_KEY=${{ env.SSH_PUB_KEY }}
+        sudo make target/all DISK=${{ env.LOOP_DEVICE }} CI=true
+        sudo make target/ci-ssh SSH_PUB_KEY=${{ env.SSH_PUB_KEY }}
+        sudo make target/ci-test
     
     - name: Unmount filesystems
       run: |
@@ -129,8 +122,8 @@ jobs:
           fi
           
           ATTEMPT=$((ATTEMPT + 1))
-          echo "Attempt $ATTEMPT failed, retrying in 15 seconds..."
-          sleep 15
+          echo "Attempt $ATTEMPT failed, retrying in 5 seconds..."
+          sleep 5
         done
         
         if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
