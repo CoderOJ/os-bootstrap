@@ -1,3 +1,5 @@
+DEBIAN_VERSION ?= trixie
+
 clean:
 	rm -rf target
 	${MAKE} util/unmount-kernelfs
@@ -90,9 +92,14 @@ target/subvolume: target/format
 	@touch $@
 
 target/bootstrap: target/subvolume
-	debootstrap --arch=amd64 trixie ./mnt https://mirrors.tuna.tsinghua.edu.cn/debian/
+	debootstrap --arch=amd64 ${DEBIAN_VERSION} ./mnt https://mirrors.tuna.tsinghua.edu.cn/debian/
+
+	# Update apt sources.list from bootstrap to full list
+	sed 's/$${DEBIAN_VERSION}/${DEBIAN_VERSION}/g' apt/sources.list.template > ./mnt/etc/apt/sources.list
+	chmod 644 ./mnt/etc/apt/sources.list
 
 	${MAKE} util/mount-kernelfs
+	chroot ./mnt apt update
 	chroot ./mnt apt install -y -o Dpkg::Options::="--force-confnew" linux-image-amd64 cloud-init btrfs-progs openssh-client openssh-server locales
 
 
@@ -108,7 +115,7 @@ target/bootstrap: target/subvolume
 target/systemd-boot: target/format
 	bootctl --path=`realpath ./mnt/boot` install
 	cp systemd-boot/loader/loader.conf mnt/boot/loader/loader.conf
-	bash systemd-boot/loader/entries/debian.conf.sh > mnt/boot/loader/entries/debian.conf
+	DEBIAN_VERSION=${DEBIAN_VERSION} bash systemd-boot/loader/entries/debian.conf.sh > mnt/boot/loader/entries/debian.conf
 
 target/all: target/bootstrap target/systemd-boot
 
