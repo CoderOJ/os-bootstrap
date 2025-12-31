@@ -2,15 +2,14 @@ network:
   version: 2
   renderer: networkd
   ethernets:
-    enp5s0f0np0:
-      link-local: []
-    enp5s0f1np1:
+    en-all:
+      match:
+        name: "en*"
       link-local: []
   bonds:
     bond0:
       interfaces:
-        - enp5s0f0np0
-        - enp5s0f1np1
+        - en-all
       parameters:
         mode: 802.3ad
         lacp-rate: fast
