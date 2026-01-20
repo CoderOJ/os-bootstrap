@@ -1,6 +1,6 @@
 #cloud-config
 
-hostname: cscg-test
+hostname: cscg-g30
 
 # Set locale and timezone
 locale: en_US.UTF-8
@@ -12,8 +12,11 @@ package_upgrade: false
 packages:
   - vim
   - fish
-  - netplan.io
-  - systemd-resolved
+  - zsh
+  - systemd-timesyncd
+  - build-essential
+  - git
+  - sssd
 
 # Configure users
 users:
@@ -22,10 +25,9 @@ users:
     shell: /bin/bash
     sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: false
-    passwd: "$6$WNl4ux61UxjDajlg$WY1TbtyED8ed7ZnRWofp09oNJsaaRBdWhDKDb.P.qRqz5gE1zqNG929RC99vT6Ip.Fuhfbn/cpNQEW4zHOoZ00"
-    # Add your SSH public key here for secure access
-    # ssh_authorized_keys:
-    #   - ssh-rsa AAAA...
+    passwd: "$6$02Ds3srhFaTryBpG$d7Jq.SRBtKp4JCN0.TdhpI6zVh5G0aC1EWJ..efZvtUliO5XikLwPR0nCDd8LhNRQOJyMhFrJbRKMfQDHKjBB1"
+    ssh_authorized_keys:
+      - sk-ssh-ed25519@openssh.com AAAAGnNrLXNzaC1lZDI1NTE5QG9wZW5zc2guY29tAAAAIFnO4E0RKlwVUg8qSvPHac8CC4kGOHweIzoUPpPlFXDiAAAABHNzaDo= yzhang
 
 # update /etc/hosts
 manage_etc_hosts: true

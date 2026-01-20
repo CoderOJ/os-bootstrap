@@ -33,7 +33,7 @@ util/unmount-kernelfs:
 	umount ./mnt/sys 	|| true
 
 target/dependency:
-	apt install gdisk btrfs-progs parted dosfstools debootstrap systemd-boot qemu-system-x86 ovmf
+	apt install gdisk btrfs-progs parted dosfstools mmdebstrap systemd-boot qemu-system-x86 ovmf
 
 	mkdir -p target
 	@touch $@
@@ -92,16 +92,17 @@ target/subvolume: target/format
 	@touch $@
 
 target/bootstrap: target/subvolume
-	debootstrap --arch=amd64 ${DEBIAN_VERSION} ./mnt https://mirrors.tuna.tsinghua.edu.cn/debian/
+	mmdebstrap \
+		--arch=amd64 \
+		--variant=apt \
+		--include=linux-image-amd64,login,systemd,systemd-sysv,systemd-resolved,sudo,cloud-init,netplan.io,btrfs-progs,openssh-client,openssh-server,locales \
+		--skip=check/empty \
+		${DEBIAN_VERSION} ./mnt
 
-	# Update apt sources.list from bootstrap to full list
 	sed 's/$${DEBIAN_VERSION}/${DEBIAN_VERSION}/g' apt/sources.list.template > ./mnt/etc/apt/sources.list
 	chmod 644 ./mnt/etc/apt/sources.list
 
 	${MAKE} util/mount-kernelfs
-	chroot ./mnt apt update
-	chroot ./mnt apt install -y -o Dpkg::Options::="--force-confnew" linux-image-amd64 cloud-init btrfs-progs openssh-client openssh-server locales
-
 
 	# Configure cloud-init nocloud datasource
 	mkdir -p ./mnt/var/lib/cloud/seed/nocloud
@@ -122,15 +123,17 @@ target/all: target/bootstrap target/systemd-boot
 test/boot: target/dependency
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
 
-	${MAKE} util/unmount
 	${MAKE} util/unmount-kernelfs
+	${MAKE} util/unmount
 
 	mkdir -p qemu-run
 	cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
 	qemu-system-x86_64 -nographic -m 4g -smp 8 \
 		  -drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 		  -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
-		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=none \
+		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=directsync \
+		  -netdev user,id=net0 \
+		  -device virtio-net-pci,netdev=net0 \
 		  -device virtio-blk-pci,drive=disk0 \
 		  -boot order=c
 
