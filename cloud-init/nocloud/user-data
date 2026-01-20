@@ -17,6 +17,7 @@ packages:
   - build-essential
   - git
   - sssd
+  - prometheus-node-exporter
 
 # Configure users
 users:
