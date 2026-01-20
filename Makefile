@@ -84,6 +84,7 @@ target/subvolume: target/format
 	${MAKE} util/mount
 
 	btrfs su create mnt/home
+	btrfs su create mnt/home/cscg
 	btrfs su create mnt/var
 	btrfs su create mnt/var/cache
 	btrfs su create mnt/opt
@@ -110,6 +111,7 @@ target/bootstrap: target/subvolume
 	cp cloud-init/nocloud/user-data ./mnt/var/lib/cloud/seed/nocloud/user-data
 	cp cloud-init/nocloud/network-config ./mnt/var/lib/cloud/seed/nocloud/network-config
 	cp cloud-init/99-local.cfg 	./mnt/etc/cloud/cloud.cfg.d/99-local.cfg
+	cp -r scripts ./mnt/home/cscg/
 
 	@touch $@
 

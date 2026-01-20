@@ -47,3 +47,5 @@ runcmd:
   - systemctl disable networking || true
   - systemctl enable --now systemd-networkd
   - systemctl enable --now systemd-resolved
+  - btrfs quota enable /
+  - btrfs quota rescan /
