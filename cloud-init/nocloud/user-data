@@ -18,6 +18,8 @@ packages:
   - git
   - sssd
   - prometheus-node-exporter
+  - wget
+  - curl
 
 # Configure users
 users:
