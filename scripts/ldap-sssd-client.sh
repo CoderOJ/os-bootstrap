@@ -8,7 +8,7 @@ AuthorizedKeysCommandUser nobody
 EOF
 systemctl restart sshd
 
-cat >> /etc/sssd/sssd.conf << EOF
+cat > /etc/sssd/sssd.conf << EOF
 [sssd]
 services = nss, pam, ssh
 domains = LDAP
@@ -43,10 +43,10 @@ enumerate = false
 use_fully_qualified_names = false
 fallback_homedir = /home/%u
 EOF
-chown 640 /etc/sssd/sssd.conf
+chmod 640 /etc/sssd/sssd.conf
 systemctl restart sssd
 
-cat >> /usr/share/pam-configs/custom-ldap-init << EOF
+cat > /usr/share/pam-configs/custom-ldap-init << EOF
 Name: LDAP User Home Initialization
 Default: yes
 Priority: 900
@@ -56,7 +56,7 @@ Session:
 EOF
 pam-auth-update
 
-cat >> /home/cscg/init-user.sh << EOF
+cat > /home/cscg/init-user.sh << 'EOF'
 #!/bin/bash
 
 USERNAME="${PAM_USER}"
@@ -79,3 +79,4 @@ if [ ! -d "$USER_HOME" ] ; then
 fi
 EOF
 chown cscg:cscg /home/cscg/init-user.sh
+chmod +x /home/cscg/init-user.sh
