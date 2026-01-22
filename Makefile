@@ -139,3 +139,11 @@ test/boot: target/dependency
 		  -device virtio-blk-pci,drive=disk0 \
 		  -boot order=c
 
+test/chroot:
+	${MAKE} util/mount
+	${MAKE} util/mount-kernelfs
+	chroot ./mnt
+
+test/scrub:
+	${MAKE} util/mount
+	btrfs scrub start -B mnt
