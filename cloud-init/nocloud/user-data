@@ -26,6 +26,8 @@ packages:
   - prometheus-node-exporter
   - wget
   - curl
+  - zstd
+  - lz4
 
 # Configure users
 users:
@@ -58,3 +60,4 @@ runcmd:
   - systemctl enable --now systemd-resolved
   - btrfs quota enable /
   - btrfs quota rescan /
+  - chown cscg:cscg -R /home/cscg
