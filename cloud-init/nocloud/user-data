@@ -28,6 +28,7 @@ packages:
   - curl
   - zstd
   - lz4
+  - iputils-ping
 
 # Configure users
 users:
