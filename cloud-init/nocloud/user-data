@@ -2,6 +2,12 @@
 
 hostname: cscg-g30
 
+# Generate locale before cloud-init tries to apply it
+# bootcmd runs early in the boot process, before the locale module
+bootcmd:
+  - sed -i '/^#.*en_US.UTF-8 UTF-8/s/^#[[:space:]]*//' /etc/locale.gen
+  - locale-gen en_US.UTF-8
+
 # Set locale and timezone
 locale: en_US.UTF-8
 timezone: Asia/Shanghai
