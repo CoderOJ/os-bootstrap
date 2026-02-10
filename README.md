@@ -1,228 +1,112 @@
 # OS Bootstrap
 
-A Debian Linux system bootstrap tool that automates the process of creating a fully configured Debian system from scratch. This tool handles disk partitioning, filesystem creation, system installation, and bootloader configuration.
+一个 Debian Linux 系统引导工具，自动化完成从零开始创建完整配置的 Debian 系统。支持磁盘分区、文件系统创建、系统安装和引导加载器配置。
 
-## Features
+## 快速开始
 
-- **GPT Partitioning**: Automated disk partitioning with EFI System Partition and Btrfs root partition
-- **Btrfs Filesystem**: Uses Btrfs with optimized subvolume layout for better management
-- **systemd-boot**: Modern UEFI bootloader configuration
-- **cloud-init**: Automated initial system configuration
-- **Minimal Base System**: Clean Debian installation with essential packages
-- **Helper Scripts**: Post-installation configuration scripts included
+⚠️ **警告：以下操作会删除目标磁盘上的所有数据！**
 
-## System Architecture
+### 完整安装（推荐）
 
-### Partition Layout
-- **Partition 1 (EFI)**: 1GB FAT32 filesystem for UEFI boot
-- **Partition 2 (Root)**: Btrfs filesystem using remaining disk space
-
-### Btrfs Subvolumes
-- `/home` - User home directories
-- `/home/cscg` - Specific user subvolume
-- `/var` - Variable data
-- `/var/cache` - Cache data (Copy-on-Write disabled for better performance)
-- `/opt` - Optional software
-
-## Requirements
-
-### Host System Dependencies
-The following packages are required on the host system:
+自动安装依赖、分区、格式化、引导系统：
 
 ```bash
-apt install gdisk btrfs-progs parted dosfstools mmdebstrap systemd-boot qemu-system-x86 ovmf
-```
-
-### Supported Debian Versions
-- Default: `trixie` (Debian 13)
-- Configurable via `DEBIAN_VERSION` variable
-
-## Usage
-
-### Basic Workflow
-
-1. **Install dependencies**:
-```bash
-make target/dependency
-```
-
-2. **Partition the disk** (⚠️ **DESTRUCTIVE OPERATION**):
-```bash
-make target/partition-disk DISK=/dev/sdX
-```
-
-3. **Format partitions**:
-```bash
-make target/format DISK=/dev/sdX
-```
-
-4. **Create Btrfs subvolumes**:
-```bash
-make target/subvolume DISK=/dev/sdX
-```
-
-5. **Bootstrap Debian system**:
-```bash
-make target/bootstrap DISK=/dev/sdX
-```
-
-6. **Install bootloader**:
-```bash
-make target/systemd-boot DISK=/dev/sdX
-```
-
-7. **Complete installation** (runs bootstrap + systemd-boot):
-```bash
+# 完成所有安装步骤（会提示确认分区操作）
 make target/all DISK=/dev/sdX
-```
 
-### Testing
-
-**Boot system in QEMU**:
-```bash
+# 使用 QEMU 测试启动
 make test/boot DISK=/dev/sdX
 ```
 
-**Enter chroot environment**:
-```bash
-make test/chroot DISK=/dev/sdX
-```
-
-**Run Btrfs scrub**:
-```bash
-make test/scrub DISK=/dev/sdX
-```
-
-### Using a Different Debian Version
+### 使用其他 Debian 版本
 
 ```bash
 make target/all DISK=/dev/sdX DEBIAN_VERSION=bookworm
 ```
 
-## Configuration
+## 功能特性
 
-### APT Sources
-The system uses Tsinghua University mirrors for faster downloads in China. Configuration is in `apt/sources.list.template`.
+- **GPT 分区**：EFI 系统分区 (1GB) + Btrfs 根分区
+- **Btrfs 文件系统**：优化的子卷布局（`/home`, `/var`, `/opt` 等）
+- **systemd-boot**：现代 UEFI 引导加载器
+- **cloud-init**：自动化初始系统配置
+- **辅助脚本**：NVIDIA 驱动、mDNS、LDAP 客户端配置
 
-### cloud-init
-Initial system configuration is handled by cloud-init with the NoCloud datasource:
-- `cloud-init/nocloud/meta-data` - Instance metadata
-- `cloud-init/nocloud/user-data` - User data and scripts
-- `cloud-init/nocloud/network-config` - Network configuration
+## 系统配置
 
-### systemd-boot
-Bootloader configuration:
-- `systemd-boot/loader/loader.conf` - Loader settings
-- `systemd-boot/loader/entries/debian.conf.sh` - Boot entry generator
+- **APT 镜像源**：使用清华大学镜像（`apt/sources.list.template`）
+- **cloud-init**：NoCloud 数据源配置（`cloud-init/nocloud/`）
+- **systemd-boot**：引导加载器配置（`systemd-boot/loader/`）
 
-## Helper Scripts
+## 辅助脚本
 
-The following post-installation scripts are included in `/home/cscg/scripts/`:
+安装后可用的配置脚本（位于 `/home/cscg/scripts/`）：
 
-- **debian-nvidia-driver.sh**: Install NVIDIA proprietary drivers
-- **enable-mdns.sh**: Enable mDNS (multicast DNS) support
-- **ldap-sssd-client.sh**: Configure LDAP authentication with SSSD
+- `debian-nvidia-driver.sh` - 安装 NVIDIA 驱动
+- `enable-mdns.sh` - 启用 mDNS 支持
+- `ldap-sssd-client.sh` - 配置 LDAP 认证
 
-## Included Packages
+## 高级用法
 
-The base system includes:
-- `linux-image-amd64` - Linux kernel
-- `systemd`, `systemd-sysv`, `systemd-resolved` - System and service manager
-- `login`, `sudo` - User authentication
-- `cloud-init` - Instance initialization
-- `netplan.io` - Network configuration
-- `btrfs-progs` - Btrfs filesystem utilities
-- `openssh-client`, `openssh-server` - SSH connectivity
-- `locales` - Localization support
+### 分步执行
 
-## Utility Commands
+如需手动控制每个步骤：
 
-### Mount/Unmount Operations
-
-**Mount partitions**:
 ```bash
+# 1. 分区磁盘
+make target/partition-disk DISK=/dev/sdX
+
+# 2. 格式化分区
+make target/format DISK=/dev/sdX
+
+# 3. 创建 Btrfs 子卷
+make target/subvolume DISK=/dev/sdX
+
+# 4. 引导系统并安装引导加载器
+make target/bootstrap DISK=/dev/sdX
+make target/systemd-boot DISK=/dev/sdX
+```
+
+### 其他测试命令
+
+```bash
+# 进入 chroot 环境
+make test/chroot DISK=/dev/sdX
+
+# 运行 Btrfs 清理
+make test/scrub DISK=/dev/sdX
+```
+
+### 工具命令
+
+```bash
+# 挂载/卸载分区
 make util/mount DISK=/dev/sdX
-```
-
-**Mount kernel filesystems** (dev, proc, sys):
-```bash
-make util/mount-kernelfs
-```
-
-**Unmount partitions**:
-```bash
 make util/unmount
-```
 
-**Unmount kernel filesystems**:
-```bash
-make util/unmount-kernelfs
-```
-
-### Clean Up
-
-**Remove all build artifacts and unmount**:
-```bash
+# 清理构建产物
 make clean
 ```
 
-## ⚠️ Important Warnings
-
-1. **Data Loss**: The partitioning and formatting operations will **DESTROY ALL DATA** on the target disk
-2. **Device Verification**: Always double-check the `DISK` variable to ensure you're targeting the correct device
-3. **Confirmation Required**: The `target/partition-disk` target requires explicit confirmation
-4. **Root Privileges**: Most operations require root/sudo privileges
-
-## Project Structure
+## 项目结构
 
 ```
 .
-├── Makefile                      # Main build system
-├── apt/
-│   └── sources.list.template     # APT repository configuration
-├── cloud-init/
-│   ├── 99-local.cfg             # cloud-init local configuration
-│   └── nocloud/                  # NoCloud datasource files
-│       ├── meta-data
-│       ├── user-data
-│       └── network-config
-├── scripts/                      # Post-installation helper scripts
-│   ├── debian-nvidia-driver.sh
-│   ├── enable-mdns.sh
-│   └── ldap-sssd-client.sh
-└── systemd-boot/
-    └── loader/                   # Bootloader configuration
-        ├── loader.conf
-        └── entries/
-            └── debian.conf.sh
+├── Makefile                      # 构建系统
+├── apt/                          # APT 配置
+├── cloud-init/                   # cloud-init 配置
+├── scripts/                      # 安装后配置脚本
+└── systemd-boot/                 # 引导加载器配置
 ```
 
-## Troubleshooting
+## 故障排查
 
-### Partition Table Issues
-If `partprobe` fails, try:
-```bash
-partprobe /dev/sdX
-# or reboot the system
-```
+**分区表问题**：运行 `partprobe /dev/sdX` 或重启系统
 
-### Mount Issues
-Ensure all filesystems are unmounted before repartitioning:
+**挂载问题**：重新分区前确保卸载所有文件系统
 ```bash
 make util/unmount-kernelfs
 make util/unmount
 ```
 
-### QEMU Boot Issues
-Ensure OVMF firmware files are installed:
-```bash
-apt install ovmf
-```
-
-## License
-
-This project is provided as-is for educational and deployment purposes.
-
-## Contributing
-
-Contributions are welcome! Please ensure all changes are tested before submitting.
+**QEMU 启动问题**：确保已安装 OVMF 固件 (`apt install ovmf`)
