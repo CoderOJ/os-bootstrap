@@ -4,24 +4,19 @@ clean:
 	rm -rf target
 	${MAKE} util/unmount-kernelfs
 	${MAKE} util/unmount
-	rm -rf mnt
+	rm -rf mnt 
 	rm -rf qemu-run
 
 util/mount:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
 
-	mkdir -p ./mnt
-	mount `lsblk -nlo PATH ${DISK} | awk 'NR==3 {print}'` ./mnt
-	mkdir -p ./mnt/boot
-	mount `lsblk -nlo PATH ${DISK} | awk 'NR==2 {print}'` ./mnt/boot
+	mount --mkdir `lsblk -nlo PATH ${DISK} | awk 'NR==3 {print}'` ./mnt
+	mount --mkdir -o fmask=077,umask=077 `lsblk -nlo PATH ${DISK} | awk 'NR==2 {print}'` ./mnt/boot
 
 util/mount-kernelfs:
-	mkdir -p ./mnt/dev
-	mount --bind /dev  ./mnt/dev
-	mkdir -p ./mnt/proc
-	mount --bind /proc ./mnt/proc
-	mkdir -p ./mnt/sys
-	mount --bind /sys  ./mnt/sys
+	mount --mkdir --bind /dev  ./mnt/dev
+	mount --mkdir --bind /proc ./mnt/proc
+	mount --mkdir --bind /sys  ./mnt/sys
 
 util/unmount:
 	umount ./mnt/boot 	|| true
@@ -33,7 +28,7 @@ util/unmount-kernelfs:
 	umount ./mnt/sys 	|| true
 
 target/dependency:
-	apt install gdisk btrfs-progs parted dosfstools mmdebstrap systemd-boot qemu-system-x86 ovmf
+	apt install gdisk btrfs-progs parted dosfstools mmdebstrap qemu-system-x86 ovmf debian-keyring debian-archive-keyring arch-install-scripts
 
 	mkdir -p target
 	@touch $@
@@ -44,12 +39,12 @@ target/partition-disk: target/dependency
 
 	# 1. 清空磁盘分区表
 	sgdisk -Z "${DISK}"
-	# 2. 创建 GPT
+	# 2. 创建 GPT (Clear)
 	sgdisk -o "${DISK}"
-	# 3. 创建 EFI 分区（FAT32）512MB
+	# 3. 创建 EFI 分区（FAT32）1G
 	sgdisk -n 1:0:+1G -t 1:EF00 -c 1:"EFI System" "${DISK}"
 	# 4. 创建 Btrfs 根分区（剩余全部）
-	sgdisk -n 2:0:0 -t 2:8300 -c 2:"Linux root (btrfs)" "${DISK}"
+	sgdisk -n 2:0:0 -t 2:8304 -c 2:"Linux root (btrfs)" "${DISK}"
 	# 重新加载分区表
 	partprobe "${DISK}"
 
@@ -67,7 +62,7 @@ target/format-root:
 	@test "${PART_ROOT}" != "" || (echo "Specify PART_ROOT"; exit 1)
 
 	@echo format ${PART_EFI} as btrfs
-	mkfs.btrfs -f -L "rootfs" ${PART_ROOT}
+	mkfs.btrfs -f ${PART_ROOT}
 
 	@touch $@
 
@@ -84,7 +79,6 @@ target/subvolume: target/format
 	${MAKE} util/mount
 
 	btrfs su create mnt/home
-	btrfs su create mnt/home/cscg
 	btrfs su create mnt/var
 	btrfs su create mnt/var/cache
 	btrfs su create mnt/opt
@@ -96,33 +90,19 @@ target/bootstrap: target/subvolume
 	mmdebstrap \
 		--arch=amd64 \
 		--variant=apt \
-		--include=linux-image-amd64,login,systemd,systemd-sysv,systemd-resolved,sudo,cloud-init,netplan.io,btrfs-progs,openssh-client,openssh-server,locales \
+		--include=linux-image-amd64,login,systemd,systemd-sysv,systemd-resolved,systemd-boot,sudo,btrfs-progs,openssh-client,openssh-server,locales,vim \
 		--skip=check/empty \
 		${DEBIAN_VERSION} ./mnt
 
-	sed 's/$${DEBIAN_VERSION}/${DEBIAN_VERSION}/g' apt/sources.list.template > ./mnt/etc/apt/sources.list
-	chmod 644 ./mnt/etc/apt/sources.list
+	genfstab -U ./mnt > ./mnt/etc/fstab
 
 	${MAKE} util/mount-kernelfs
 
-	# Configure cloud-init nocloud datasource
-	mkdir -p ./mnt/var/lib/cloud/seed/nocloud
-	cp cloud-init/nocloud/meta-data ./mnt/var/lib/cloud/seed/nocloud/meta-data
-	cp cloud-init/nocloud/user-data ./mnt/var/lib/cloud/seed/nocloud/user-data
-	cp cloud-init/nocloud/network-config ./mnt/var/lib/cloud/seed/nocloud/network-config
-	cp cloud-init/99-local.cfg 	./mnt/etc/cloud/cloud.cfg.d/99-local.cfg
-	cp -r scripts ./mnt/home/cscg/
-
 	@touch $@
-
-target/systemd-boot: target/format
-	bootctl --path=`realpath ./mnt/boot` install
-	cp systemd-boot/loader/loader.conf mnt/boot/loader/loader.conf
-	DEBIAN_VERSION=${DEBIAN_VERSION} bash systemd-boot/loader/entries/debian.conf.sh > mnt/boot/loader/entries/debian.conf
 
 target/all: target/bootstrap target/systemd-boot
 
-test/boot: target/dependency
+test/boot:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
 
 	${MAKE} util/unmount-kernelfs
@@ -131,13 +111,11 @@ test/boot: target/dependency
 	mkdir -p qemu-run
 	cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
 	qemu-system-x86_64 -nographic -m 4g -smp 8 \
-		  -drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-		  -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
+		  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=directsync \
 		  -netdev user,id=net0 \
 		  -device virtio-net-pci,netdev=net0 \
-		  -device virtio-blk-pci,drive=disk0 \
-		  -boot order=c
+		  -device virtio-blk-pci,drive=disk0
 
 test/chroot:
 	${MAKE} util/mount
