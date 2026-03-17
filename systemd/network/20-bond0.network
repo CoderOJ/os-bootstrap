@@ -1,0 +1,6 @@
+[Match]
+Name=bond0
+
+[Network]
+Address=10.1.1.${HOSTID}/22
+Gateway=10.1.0.1

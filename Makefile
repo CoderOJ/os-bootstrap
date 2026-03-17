@@ -1,4 +1,5 @@
 DEBIAN_VERSION ?= trixie
+HOSTID ?= 1
 
 clean:
 	rm -rf target
@@ -11,7 +12,7 @@ util/mount:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
 
 	mount --mkdir `lsblk -nlo PATH ${DISK} | awk 'NR==3 {print}'` ./mnt
-	mount --mkdir -o fmask=077,umask=077 `lsblk -nlo PATH ${DISK} | awk 'NR==2 {print}'` ./mnt/boot
+	mount --mkdir -o fmask=027,umask=027 `lsblk -nlo PATH ${DISK} | awk 'NR==2 {print}'` ./mnt/boot
 
 util/mount-kernelfs:
 	mount --mkdir --bind /dev  ./mnt/dev
@@ -28,7 +29,7 @@ util/unmount-kernelfs:
 	umount ./mnt/sys 	|| true
 
 target/dependency:
-	apt install gdisk btrfs-progs parted dosfstools mmdebstrap qemu-system-x86 ovmf debian-keyring debian-archive-keyring arch-install-scripts
+	apt install gdisk btrfs-progs parted dosfstools debootstrap qemu-system-x86 ovmf arch-install-scripts
 
 	mkdir -p target
 	@touch $@
@@ -70,6 +71,7 @@ target/format: target/partition-disk
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
 
 	mkdir -p ./mnt
+
 	${MAKE} target/format-root "PART_ROOT=`lsblk -nlo PATH ${DISK} | awk 'NR==3 {print}'`"
 	${MAKE} target/format-efi  "PART_EFI=`lsblk -nlo PATH ${DISK} | awk 'NR==2 {print}'`"
 	
@@ -87,20 +89,36 @@ target/subvolume: target/format
 	@touch $@
 
 target/bootstrap: target/subvolume
+	
+	@echo "Bootstrapping Debian ${DEBIAN_VERSION} into ./mnt"
 	mmdebstrap \
+		--verbose \
 		--arch=amd64 \
 		--variant=apt \
-		--include=linux-image-amd64,login,systemd,systemd-sysv,systemd-resolved,systemd-boot,sudo,btrfs-progs,openssh-client,openssh-server,locales,vim \
 		--skip=check/empty \
+		--components=main,contrib,non-free,non-free-firmware \
+		--include="$$(grep -vE "^\s*#" requires.txt | tr "\n" " ")" \
+		--essential-hook='echo "root=UUID=$$(findmnt -no UUID $$1) rw console=ttyS0,115200" > $$1/etc/kernel/cmdline' \
 		${DEBIAN_VERSION} ./mnt
 
-	genfstab -U ./mnt > ./mnt/etc/fstab
+	@echo "Generating fstab"
+	./genfstab -U ./mnt > ./mnt/etc/fstab
 
-	${MAKE} util/mount-kernelfs
+	@echo "Setting root password"
+	arch-chroot ./mnt passwd
 
+	@echo "Setting up network and resolvconf services"
+	arch-chroot ./mnt systemctl enable systemd-networkd systemd-resolved
+	ln -sf ../run/systemd/resolve/stub-resolv.conf ./mnt/etc/resolv.conf
+	cp systemd/network/20-bond0.netdev ./mnt/etc/systemd/network/20-bond0.netdev
+	sed 's/$${HOSTID}/${HOSTID}/g' systemd/network/20-bond0.network > ./mnt/etc/systemd/network/20-bond0.network
+	cp systemd/network/20-ethernet-bond0.network ./mnt/etc/systemd/network/20-ethernet-bond0.network
+
+	@echo "Setting hostname"
+	echo "i${HOSTID}" > ./mnt/etc/hostname
 	@touch $@
 
-target/all: target/bootstrap target/systemd-boot
+target/all: target/bootstrapx
 
 test/boot:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
@@ -112,10 +130,11 @@ test/boot:
 	cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
 	qemu-system-x86_64 -nographic -m 4g -smp 8 \
 		  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+		  -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
 		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=directsync \
 		  -netdev user,id=net0 \
 		  -device virtio-net-pci,netdev=net0 \
-		  -device virtio-blk-pci,drive=disk0
+		  -device virtio-blk-pci,drive=disk0,bootindex=0
 
 test/chroot:
 	${MAKE} util/mount
