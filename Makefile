@@ -1,5 +1,6 @@
 DEBIAN_VERSION ?= trixie
 HOSTID ?= 1
+HOSTNAME ?= i
 
 clean:
 	rm -rf target
@@ -62,7 +63,7 @@ target/format-efi:
 target/format-root:
 	@test "${PART_ROOT}" != "" || (echo "Specify PART_ROOT"; exit 1)
 
-	@echo format ${PART_EFI} as btrfs
+	@echo format ${PART_ROOT} as btrfs
 	mkfs.btrfs -f ${PART_ROOT}
 
 	@touch $@
@@ -91,6 +92,7 @@ target/subvolume: target/format
 target/bootstrap: target/subvolume
 	
 	@echo "Bootstrapping Debian ${DEBIAN_VERSION} into ./mnt"
+	mkdir -p ./mnt/etc/kernel
 	mmdebstrap \
 		--verbose \
 		--arch=amd64 \
@@ -115,10 +117,10 @@ target/bootstrap: target/subvolume
 	cp systemd/network/20-ethernet-bond0.network ./mnt/etc/systemd/network/20-ethernet-bond0.network
 
 	@echo "Setting hostname"
-	echo "i${HOSTID}" > ./mnt/etc/hostname
+	echo "${HOSTNAME}${HOSTID}" > ./mnt/etc/hostname
 	@touch $@
 
-target/all: target/bootstrapx
+target/all: target/bootstrap
 
 test/boot:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
