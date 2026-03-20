@@ -2,6 +2,7 @@ dpkg-dev
 sudo
 linux-headers-amd64
 linux-image-amd64
+kmod
 firmware-linux-free
 firmware-linux-nonfree
 build-essential
@@ -12,6 +13,9 @@ nfs-common
 nfs-kernel-server
 btrfs-progs
 dosfstools
+zfsutils-linux
+zfs-dkms
+zfs-zed
 bash
 dialog
 readline-common
@@ -22,6 +26,7 @@ systemd-boot-efi
 systemd-timesyncd
 systemd-resolved
 iptables
+iproute2
 iputils-ping
 openssh-client
 openssh-server
