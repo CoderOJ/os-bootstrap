@@ -92,32 +92,45 @@ target/subvolume: target/format
 target/bootstrap: target/subvolume
 	
 	@echo "Bootstrapping Debian ${DEBIAN_VERSION} into ./mnt"
-	mkdir -p ./mnt/etc/kernel
-	mmdebstrap \
-		--verbose \
+	debootstrap \
 		--arch=amd64 \
-		--variant=apt \
-		--skip=check/empty \
-		--components=main,contrib,non-free,non-free-firmware \
-		--include="$$(grep -vE "^\s*#" requires.txt | tr "\n" " ")" \
-		--essential-hook='echo "root=UUID=$$(findmnt -no UUID $$1) rw console=ttyS0,115200" > $$1/etc/kernel/cmdline' \
+		--variant=minbase \
 		${DEBIAN_VERSION} ./mnt
 
+	@echo "Setting kernel cmdline"
+	echo "root=UUID=`findmnt -no UUID ./mnt` rw" > ./mnt/etc/kernel/cmdline
+	
 	@echo "Generating fstab"
 	./genfstab -U ./mnt > ./mnt/etc/fstab
 
-	@echo "Setting root password"
-	arch-chroot ./mnt passwd
+	@echo "Setting up APT sources"
+	rm ./mnt/etc/apt/sources.list
+	cp ./mnt/usr/share/doc/apt/examples/debian.sources ./mnt/etc/apt/sources.list.d
 
-	@echo "Setting up network and resolvconf services"
+	@echo "Installing necessary packages"
+	arch-chroot ./mnt apt update
+	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
+		`grep -vE "^\s*#" requires.txt | tr "\n" " "`
+	
+	@touch $@
+
+target/passwd: target/bootstrap
+	@echo "Setting root password"
+	echo "root:$y$j9T$owqKSbkFGt/QiF6cL2vn91$9AFWGKvBPYdJYbWz3H6e7YNyRYFPCBk5ZHS2cBCZ1l4" | arch-chroot ./mnt chpasswd -e
+	
+	@touch $@
+
+target/network: target/bootstrap
+	@echo "Setting up networkd and resolved services"
 	arch-chroot ./mnt systemctl enable systemd-networkd systemd-resolved
 	ln -sf ../run/systemd/resolve/stub-resolv.conf ./mnt/etc/resolv.conf
 	cp systemd/network/20-bond0.netdev ./mnt/etc/systemd/network/20-bond0.netdev
 	sed 's/$${HOSTID}/${HOSTID}/g' systemd/network/20-bond0.network > ./mnt/etc/systemd/network/20-bond0.network
-	cp systemd/network/20-ethernet-bond0.network ./mnt/etc/systemd/network/20-ethernet-bond0.network
-
+	cp systemd/network/20-enp-bond0.network ./mnt/etc/systemd/network/20-enp-bond0.network
+	
 	@echo "Setting hostname"
 	echo "${HOSTNAME}${HOSTID}" > ./mnt/etc/hostname
+	
 	@touch $@
 
 target/all: target/bootstrap
@@ -130,7 +143,7 @@ test/boot:
 
 	mkdir -p qemu-run
 	cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
-	qemu-system-x86_64 -nographic -m 4g -smp 8 \
+	qemu-system-x86_64 -m 4g -smp 8 -enable-kvm \
 		  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 		  -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
 		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=directsync \
