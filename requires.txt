@@ -1,3 +1,5 @@
+apt-transport-https
+ca-certificates
 dpkg-dev
 sudo
 linux-headers-amd64

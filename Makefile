@@ -4,7 +4,6 @@ HOSTNAME ?= i
 
 clean:
 	rm -rf target
-	${MAKE} util/unmount-kernelfs
 	${MAKE} util/unmount
 	rm -rf mnt 
 	rm -rf qemu-run
@@ -15,19 +14,9 @@ util/mount:
 	mount --mkdir `lsblk -nlo PATH ${DISK} | awk 'NR==3 {print}'` ./mnt
 	mount --mkdir -o fmask=027,umask=027 `lsblk -nlo PATH ${DISK} | awk 'NR==2 {print}'` ./mnt/boot
 
-util/mount-kernelfs:
-	mount --mkdir --bind /dev  ./mnt/dev
-	mount --mkdir --bind /proc ./mnt/proc
-	mount --mkdir --bind /sys  ./mnt/sys
-
 util/unmount:
 	umount ./mnt/boot 	|| true
 	umount ./mnt 		|| true
-
-util/unmount-kernelfs:
-	umount ./mnt/dev	|| true
-	umount ./mnt/proc 	|| true
-	umount ./mnt/sys 	|| true
 
 target/dependency:
 	apt install gdisk btrfs-progs parted dosfstools debootstrap qemu-system-x86 ovmf arch-install-scripts
@@ -98,7 +87,7 @@ target/bootstrap: target/subvolume
 		${DEBIAN_VERSION} ./mnt
 
 	@echo "Setting kernel cmdline"
-	echo "root=UUID=`findmnt -no UUID ./mnt` rw" > ./mnt/etc/kernel/cmdline
+	echo "root=UUID=`findmnt -no UUID ./mnt` rw console=tty0 console=ttyS0,115200n8" > ./mnt/etc/kernel/cmdline
 	
 	@echo "Generating fstab"
 	./genfstab -U ./mnt > ./mnt/etc/fstab
@@ -112,12 +101,12 @@ target/bootstrap: target/subvolume
 	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
 		`grep -vE "^\s*#" requires.txt | tr "\n" " "`
 	
-	@touch $@
-
-target/passwd: target/bootstrap
 	@echo "Setting root password"
-	echo "root:$y$j9T$owqKSbkFGt/QiF6cL2vn91$9AFWGKvBPYdJYbWz3H6e7YNyRYFPCBk5ZHS2cBCZ1l4" | arch-chroot ./mnt chpasswd -e
+	cat passwd.txt | arch-chroot ./mnt chpasswd -e
 	
+	@echo "Setting hostname"
+	echo "${HOSTNAME}${HOSTID}" > ./mnt/etc/hostname
+
 	@touch $@
 
 target/network: target/bootstrap
@@ -128,9 +117,6 @@ target/network: target/bootstrap
 	sed 's/$${HOSTID}/${HOSTID}/g' systemd/network/20-bond0.network > ./mnt/etc/systemd/network/20-bond0.network
 	cp systemd/network/20-enp-bond0.network ./mnt/etc/systemd/network/20-enp-bond0.network
 	
-	@echo "Setting hostname"
-	echo "${HOSTNAME}${HOSTID}" > ./mnt/etc/hostname
-	
 	@touch $@
 
 target/all: target/bootstrap
@@ -138,12 +124,11 @@ target/all: target/bootstrap
 test/boot:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
 
-	${MAKE} util/unmount-kernelfs
 	${MAKE} util/unmount
 
 	mkdir -p qemu-run
 	cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
-	qemu-system-x86_64 -m 4g -smp 8 -enable-kvm \
+	qemu-system-x86_64 -m 4g -smp 8 -enable-kvm -nographic \
 		  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 		  -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
 		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=directsync \
@@ -152,10 +137,7 @@ test/boot:
 		  -device virtio-blk-pci,drive=disk0,bootindex=0
 
 test/chroot:
-	${MAKE} util/mount
-	${MAKE} util/mount-kernelfs
-	chroot ./mnt
+	arch-chroot ./mnt
 
 test/scrub:
-	${MAKE} util/mount
 	btrfs scrub start -B mnt

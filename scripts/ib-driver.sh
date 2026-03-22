@@ -1,0 +1,6 @@
+#!/bin/bash
+
+wget https://www.mellanox.com/downloads/DOCA/DOCA_v3.3.0/host/doca-host_3.3.0-088000-26.01-debian13_amd64.deb
+sudo dpkg -i doca-host_3.3.0-088000-26.01-debian13_amd64.deb
+sudo apt-get update
+sudo apt-get -y install doca-ofed
