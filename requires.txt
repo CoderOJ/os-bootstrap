@@ -1,5 +1,8 @@
+# [https]
 apt-transport-https
 ca-certificates
+
+# [linux]
 dpkg-dev
 sudo
 linux-headers-amd64
@@ -10,7 +13,22 @@ firmware-linux-nonfree
 build-essential
 locales
 login
+dialog
+readline-common
+info
+
+# [editor]
 vim
+neovim
+less
+
+# [shell]
+bash
+dash
+zsh
+fish
+
+# [fs]
 nfs-common
 nfs-kernel-server
 btrfs-progs
@@ -18,15 +36,16 @@ dosfstools
 zfsutils-linux
 zfs-dkms
 zfs-zed
-bash
-dialog
-readline-common
+
+# [systemd]
 systemd
 systemd-sysv
 systemd-boot
 systemd-boot-efi
 systemd-timesyncd
 systemd-resolved
+
+# [network]
 iptables
 iproute2
 iputils-ping
@@ -34,6 +53,8 @@ openssh-client
 openssh-server
 ipmitool
 openipmi
+
+# [tools]
 pciutils
 nvtop
 efibootmgr
@@ -46,3 +67,15 @@ git
 wget
 curl
 htop
+
+# [ib driver]
+mlnx-ofed-kernel-dkms
+mlnx-ofed-kernel-utils
+rdma-core
+ibverbs-utils
+infiniband-diags
+ethtool
+
+# [nvidia gpu driver]
+nvidia-driver-cuda
+nvidia-kernel-open-dkms

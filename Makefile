@@ -78,13 +78,23 @@ target/subvolume: target/format
 
 	@touch $@
 
-target/bootstrap: target/subvolume
-	
+target/nvidia.deb:
+	@echo "Downloading NVIDIA driver deb package"
+	wget https://developer.download.nvidia.com/compute/nvidia-driver/590.48.01/local_installers/nvidia-driver-local-repo-debian13-590.48.01_1.0-1_amd64.deb -o $@
+
+target/doca.deb:
+	@echo "Downloading DOCA driver deb package"
+	wget https://www.mellanox.com/downloads/DOCA/DOCA_v3.3.0/host/doca-host_3.3.0-088000-26.01-debian13_amd64.deb -o $@
+
+target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 	@echo "Bootstrapping Debian ${DEBIAN_VERSION} into ./mnt"
 	debootstrap \
 		--arch=amd64 \
 		--variant=minbase \
 		${DEBIAN_VERSION} ./mnt
+	
+	dpkg --root=./mnt -i target/doca.deb target/nvidia.deb
+	cp ./mnt/var/nvidia-driver-local-repo-debian*/nvidia-driver-local-*-keyring.gpg ./mnt/usr/share/keyrings/
 
 	@echo "Setting kernel cmdline"
 	echo "root=UUID=`findmnt -no UUID ./mnt` rw console=tty0 console=ttyS0,115200n8" > ./mnt/etc/kernel/cmdline
@@ -119,7 +129,7 @@ target/network: target/bootstrap
 	
 	@touch $@
 
-target/all: target/bootstrap
+target/all: target/network
 
 test/boot:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
