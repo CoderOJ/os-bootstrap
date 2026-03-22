@@ -127,9 +127,6 @@ target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 	sed 's/$${HOSTID}/${HOSTID}/g' systemd/system/opensm.service > ./mnt/etc/systemd/system/opensm.service
 	arch-chroot ./mnt systemctl enable opensm
 
-	@touch $@
-
-target/network: target/bootstrap
 	@echo "Setting up networkd and resolved services"
 	arch-chroot ./mnt systemctl enable systemd-networkd systemd-resolved
 	ln -sf ../run/systemd/resolve/stub-resolv.conf ./mnt/etc/resolv.conf
@@ -137,6 +134,11 @@ target/network: target/bootstrap
 	sed 's/$${HOSTID}/${HOSTID}/g' systemd/network/20-bond0.network > ./mnt/etc/systemd/network/20-bond0.network
 	cp systemd/network/20-enp-bond0.network ./mnt/etc/systemd/network/20-enp-bond0.network
 	
+	@echo "Setting up IP over IB"
+	cp systemd/network/20-bond1.netdev ./mnt/etc/systemd/network/20-bond1.netdev
+	sed 's/$${HOSTID}/${HOSTID}/g' systemd/network/20-bond1.network > ./mnt/etc/systemd/network/20-bond1.network
+	cp systemd/network/20-ib-bond1.network ./mnt/etc/systemd/network/20-ib-bond1.network
+
 	@touch $@
 
 target/all: target/network

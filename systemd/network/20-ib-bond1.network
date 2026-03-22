@@ -1,0 +1,6 @@
+[Match]
+Name=ib*
+Type=infiniband
+
+[Network]
+Bond=bond1

@@ -1,0 +1,5 @@
+[Match]
+Name=bond1
+
+[Network]
+Address=10.0.0.${HOSTID}/24
