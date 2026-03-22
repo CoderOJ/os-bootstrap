@@ -93,6 +93,7 @@ target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 		--variant=minbase \
 		${DEBIAN_VERSION} ./mnt
 	
+	# install nivida gpu driver and ofed driver
 	dpkg --root=./mnt -i target/doca.deb target/nvidia.deb
 	cp ./mnt/var/nvidia-driver-local-repo-debian*/nvidia-driver-local-*-keyring.gpg ./mnt/usr/share/keyrings/
 
@@ -120,7 +121,12 @@ target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 	@echo "Setting root ssh authorized keys"
 	mkdir -p ./mnt/root/.ssh
 	cat ssh_keys.txt | arch-chroot ./mnt tee -a /root/.ssh/authorized_keys
-	
+
+	@echo "Setting up OpenSM and InfiniBand modules"
+	cp modules-load.d/ib.conf ./mnt/etc/modules-load.d/ib.conf
+	sed 's/$${HOSTID}/${HOSTID}/g' systemd/system/opensm.service > ./mnt/etc/systemd/system/opensm.service
+	arch-chroot ./mnt systemctl enable opensm
+
 	@touch $@
 
 target/network: target/bootstrap

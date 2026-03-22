@@ -67,6 +67,7 @@ git
 wget
 curl
 htop
+kexec-tools
 
 # [ib driver]
 mlnx-ofed-kernel-dkms
@@ -75,8 +76,10 @@ rdma-core
 ibverbs-utils
 ibverbs-providers
 infiniband-diags
+opensm
 ethtool
 
 # [nvidia gpu driver]
 nvidia-driver-cuda
 nvidia-kernel-open-dkms
+nvidia-persistenced
