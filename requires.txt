@@ -73,6 +73,7 @@ mlnx-ofed-kernel-dkms
 mlnx-ofed-kernel-utils
 rdma-core
 ibverbs-utils
+ibverbs-providers
 infiniband-diags
 ethtool
 
