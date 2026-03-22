@@ -117,6 +117,10 @@ target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 	@echo "Setting hostname"
 	echo "${HOSTNAME}${HOSTID}" > ./mnt/etc/hostname
 
+	@echo "Setting root ssh authorized keys"
+	mkdir -p ./mnt/root/.ssh
+	cat ssh_keys.txt | arch-chroot ./mnt tee -a /root/.ssh/authorized_keys
+	
 	@touch $@
 
 target/network: target/bootstrap
