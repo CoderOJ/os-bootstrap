@@ -111,7 +111,10 @@ target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 	arch-chroot ./mnt apt update
 	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
 		`grep -vE "^\s*#" requires.txt | tr "\n" " "`
-	
+
+	@touch $@
+
+target/configure: target/bootstrap
 	@echo "Setting root password"
 	cat passwd.txt | arch-chroot ./mnt chpasswd -e
 	
@@ -141,7 +144,7 @@ target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 
 	@touch $@
 
-target/all: target/network
+target/all: target/configure
 
 test/boot:
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
