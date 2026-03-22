@@ -30,7 +30,7 @@ util/unmount-kernelfs:
 	umount ./mnt/sys 	|| true
 
 target/dependency:
-	apt install gdisk btrfs-progs parted dosfstools mmdebstrap qemu-system-x86 ovmf arch-install-scripts
+	apt install gdisk btrfs-progs parted dosfstools debootstrap qemu-system-x86 ovmf arch-install-scripts
 
 	mkdir -p target
 	@touch $@
