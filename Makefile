@@ -80,11 +80,11 @@ target/subvolume: target/format
 
 target/nvidia.deb:
 	@echo "Downloading NVIDIA driver deb package"
-	wget https://developer.download.nvidia.com/compute/nvidia-driver/590.48.01/local_installers/nvidia-driver-local-repo-debian13-590.48.01_1.0-1_amd64.deb -o $@
+	wget https://developer.download.nvidia.com/compute/nvidia-driver/590.48.01/local_installers/nvidia-driver-local-repo-debian13-590.48.01_1.0-1_amd64.deb -O $@
 
 target/doca.deb:
 	@echo "Downloading DOCA driver deb package"
-	wget https://www.mellanox.com/downloads/DOCA/DOCA_v3.3.0/host/doca-host_3.3.0-088000-26.01-debian13_amd64.deb -o $@
+	wget https://www.mellanox.com/downloads/DOCA/DOCA_v3.3.0/host/doca-host_3.3.0-088000-26.01-debian13_amd64.deb -O $@
 
 target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 	@echo "Bootstrapping Debian ${DEBIAN_VERSION} into ./mnt"
