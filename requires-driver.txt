@@ -15,7 +15,6 @@ infiniband-diags
 opensm
 mft
 mft-mlx5
-kernel-mft-dkms
 perftest
 
 # [nvidia gpu driver]
