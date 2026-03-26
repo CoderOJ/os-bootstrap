@@ -20,6 +20,7 @@ info
 # [editor]
 vim
 neovim
+nano
 less
 
 # [shell]
