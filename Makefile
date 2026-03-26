@@ -171,7 +171,7 @@ test/boot:
 		  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 		  -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
 		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=directsync \
-		  -netdev user,id=net0,addr=10.1.0.0/22,host=10.1.0.1,dns=10.1.0.1 \
+		  -netdev user,id=net0,net=10.1.0.0/22,host=10.1.0.1,dns=10.1.0.2 \
 		  -device virtio-net-pci,netdev=net0 \
 		  -device virtio-blk-pci,drive=disk0,bootindex=0
 
