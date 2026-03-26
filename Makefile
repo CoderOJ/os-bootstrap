@@ -2,6 +2,9 @@ DEBIAN_VERSION ?= trixie
 HOSTID ?= 1
 HOSTNAME ?= i
 
+clean-deb: 
+	rm -rf nvidia.deb doca.deb
+
 clean:
 	rm -rf target
 	${MAKE} util/unmount
@@ -78,15 +81,15 @@ target/subvolume: target/format
 
 	@touch $@
 
-target/nvidia.deb:
+nvidia.deb:
 	@echo "Downloading NVIDIA driver deb package"
 	wget https://developer.download.nvidia.com/compute/nvidia-driver/590.48.01/local_installers/nvidia-driver-local-repo-debian13-590.48.01_1.0-1_amd64.deb -O $@
 
-target/doca.deb:
+doca.deb:
 	@echo "Downloading DOCA driver deb package"
 	wget https://www.mellanox.com/downloads/DOCA/DOCA_v3.3.0/host/doca-host_3.3.0-088000-26.01-debian13_amd64.deb -O $@
 
-target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
+target/bootstrap: target/subvolume nvidia.deb doca.deb
 	@echo "Bootstrapping Debian ${DEBIAN_VERSION} into ./mnt"
 	debootstrap \
 		--arch=amd64 \
@@ -94,7 +97,7 @@ target/bootstrap: target/subvolume target/nvidia.deb target/doca.deb
 		${DEBIAN_VERSION} ./mnt
 	
 	# install nivida gpu driver and ofed driver
-	dpkg --root=./mnt -i target/doca.deb target/nvidia.deb
+	dpkg --root=./mnt -i doca.deb nvidia.deb
 	cp ./mnt/var/nvidia-driver-local-repo-debian*/nvidia-driver-local-*-keyring.gpg ./mnt/usr/share/keyrings/
 
 	@echo "Setting kernel cmdline"

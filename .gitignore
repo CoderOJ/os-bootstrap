@@ -2,3 +2,4 @@ mnt
 target
 qemu-run
 *.swp
+*.deb
