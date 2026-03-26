@@ -115,6 +115,9 @@ target/bootstrap: target/subvolume nvidia.deb doca.deb
 	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
 		`grep -vE "^\s*#" requires-basic.txt | tr "\n" " "`
 
+	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
+		`grep -vE "^\s*#" requires-kernel.txt | tr "\n" " "`
+
 	@touch $@
 
 target/driver: target/bootstrap
