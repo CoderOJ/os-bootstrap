@@ -140,7 +140,7 @@ target/configure: target/driver
 
 	@echo "Setting root ssh authorized keys"
 	mkdir -p ./mnt/root/.ssh
-	cat ssh_keys.txt | arch-chroot ./mnt tee -a /root/.ssh/authorized_keys
+	cat ssh_keys.txt > ./mnt/root/.ssh/authorized_keys
 
 	@echo "Setting up OpenSM and InfiniBand modules"
 	cp modules-load.d/ib.conf ./mnt/etc/modules-load.d/ib.conf
