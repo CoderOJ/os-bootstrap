@@ -12,9 +12,4 @@ ca-certificates
 # [terminal]
 dialog
 readline-common
-
-# [editor]
-vim
-neovim
-nano
-less
+locales

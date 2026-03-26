@@ -4,6 +4,12 @@ dash
 zsh
 fish
 
+# [editor]
+vim
+neovim
+nano
+less
+
 # [linux]
 linux-headers-amd64
 linux-image-amd64
@@ -11,7 +17,6 @@ kmod
 firmware-linux-free
 firmware-linux-nonfree
 build-essential
-locales
 
 # [fs]
 nfs-common
