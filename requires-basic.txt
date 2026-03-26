@@ -3,6 +3,7 @@ dpkg-dev
 sudo
 login
 info
+tzdata
 
 # [https]
 apt-transport-https
@@ -17,9 +18,3 @@ vim
 neovim
 nano
 less
-
-# [shell]
-bash
-dash
-zsh
-fish
