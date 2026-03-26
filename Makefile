@@ -112,20 +112,21 @@ target/bootstrap: target/subvolume nvidia.deb doca.deb
 
 	@echo "Installing necessary packages"
 	arch-chroot ./mnt apt update
-	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V -vvv \
+	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
 		`grep -vE "^\s*#" requires-basic.txt | tr "\n" " "`
 
 	arch-chroot ./mnt dpkg-reconfigure locales tzdata
 
-	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V -vvv \
+	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
 		`grep -vE "^\s*#" requires-kernel.txt | tr "\n" " "`
 
 	@touch $@
 
 target/driver: target/bootstrap
 	@echo "Installing NVIDIA and DOCA drivers"
+
 	arch-chroot ./mnt apt update
-	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V -vvv \
+	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
 		`grep -vE "^\s*#" requires-driver.txt | tr "\n" " "`
 
 	@touch $@
