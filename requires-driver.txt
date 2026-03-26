@@ -1,6 +1,7 @@
 # [ib driver]
 mlnx-ofed-kernel-dkms
 mlnx-ofed-kernel-utils
+mlnx-nfsrdma-dkms
 mlnx-iproute2
 mlnx-ethtool
 ofed-scripts

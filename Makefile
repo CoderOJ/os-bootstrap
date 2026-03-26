@@ -73,7 +73,6 @@ target/format: target/partition-disk
 target/subvolume: target/format
 	${MAKE} util/mount
 
-	btrfs su create mnt/home
 	btrfs su create mnt/var
 	btrfs su create mnt/var/cache
 	btrfs su create mnt/opt
@@ -104,7 +103,7 @@ target/bootstrap: target/subvolume nvidia.deb doca.deb
 	echo "root=UUID=`findmnt -no UUID ./mnt` rw console=tty0 console=ttyS0,115200n8" > ./mnt/etc/kernel/cmdline
 	
 	@echo "Generating fstab"
-	./genfstab -U ./mnt > ./mnt/etc/fstab
+	./genfstab > ./mnt/etc/fstab
 
 	@echo "Setting up APT sources"
 	rm ./mnt/etc/apt/sources.list

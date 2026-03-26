@@ -5,4 +5,3 @@ Name=bond1
 Address=10.0.0.${HOSTID}/24
 DHCP=no
 IPv6AcceptRA=no
-MTUBytes=1000
