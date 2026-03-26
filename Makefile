@@ -96,7 +96,7 @@ target/bootstrap: target/subvolume nvidia.deb doca.deb
 		--variant=minbase \
 		${DEBIAN_VERSION} ./mnt
 	
-	# install nivida gpu driver and ofed driver
+	# install nivida gpu driver and ofed driver package source lists and keyrings into the chroot environment
 	dpkg --root=./mnt -i doca.deb nvidia.deb
 	cp ./mnt/var/nvidia-driver-local-repo-debian*/nvidia-driver-local-*-keyring.gpg ./mnt/usr/share/keyrings/
 
@@ -113,11 +113,19 @@ target/bootstrap: target/subvolume nvidia.deb doca.deb
 	@echo "Installing necessary packages"
 	arch-chroot ./mnt apt update
 	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
-		`grep -vE "^\s*#" requires.txt | tr "\n" " "`
+		`grep -vE "^\s*#" requires-basic.txt | tr "\n" " "`
 
 	@touch $@
 
-target/configure: target/bootstrap
+target/driver: target/bootstrap
+	@echo "Installing NVIDIA and DOCA drivers"
+	arch-chroot ./mnt apt update
+	arch-chroot ./mnt apt install -y --no-install-recommends --show-progress -V \
+		`grep -vE "^\s*#" requires-driver.txt | tr "\n" " "`
+
+	@touch $@
+
+target/configure: target/driver
 	@echo "Setting root password"
 	cat passwd.txt | arch-chroot ./mnt chpasswd -e
 	
@@ -156,11 +164,11 @@ test/boot:
 
 	mkdir -p qemu-run
 	cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
-	qemu-system-x86_64 -m 4g -smp 8 -enable-kvm -nographic \
+	qemu-system-x86_64 -m 4g -smp 8 -nographic \
 		  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 		  -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
 		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=directsync \
-		  -netdev user,id=net0 \
+		  -netdev user,id=net0,addr=10.1.0.0/22,host=10.1.0.1,dns=10.1.0.1 \
 		  -device virtio-net-pci,netdev=net0 \
 		  -device virtio-blk-pci,drive=disk0,bootindex=0
 

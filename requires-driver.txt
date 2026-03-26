@@ -1,0 +1,24 @@
+# [ib driver]
+mlnx-ofed-kernel-dkms
+mlnx-ofed-kernel-utils
+mlnx-iproute2
+mlnx-ethtool
+ofed-scripts
+rdma-core
+rdmacm-utils
+ibacm
+ibarr
+ibutils2
+ibverbs-utils
+ibverbs-providers
+infiniband-diags
+opensm
+mft
+mft-mlx5
+kernel-mft-dkms
+perftest
+
+# [nvidia gpu driver]
+nvidia-driver-cuda
+nvidia-kernel-open-dkms
+nvidia-persistenced
