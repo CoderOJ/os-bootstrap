@@ -29,6 +29,13 @@ packages:
   - zstd
   - lz4
   - iputils-ping
+  - zip
+  - tmux
+  - nvitop
+  - numactl
+  - hwloc
+  - lsof
+  - strace
 
 # Configure users
 users:
