@@ -96,7 +96,7 @@ target/bootstrap: target/subvolume
 	mmdebstrap \
 		--arch=amd64 \
 		--variant=apt \
-		--include=linux-image-amd64,login,systemd,systemd-sysv,systemd-resolved,sudo,cloud-init,netplan.io,btrfs-progs,openssh-client,openssh-server,locales \
+		--include=linux-image-amd64,login,systemd,systemd-sysv,systemd-resolved,systemd-boot,sudo,cloud-init,netplan.io,btrfs-progs,openssh-client,openssh-server,locales \
 		--skip=check/empty \
 		${DEBIAN_VERSION} ./mnt
 
@@ -115,10 +115,8 @@ target/bootstrap: target/subvolume
 
 	@touch $@
 
-target/systemd-boot: target/format
-	bootctl --path=`realpath ./mnt/boot` install
-	cp systemd-boot/loader/loader.conf mnt/boot/loader/loader.conf
-	DEBIAN_VERSION=${DEBIAN_VERSION} bash systemd-boot/loader/entries/debian.conf.sh > mnt/boot/loader/entries/debian.conf
+target/systemd-boot: target/bootstrap
+	bash systemd-boot/install.sh ./mnt systemd-boot/loader/loader.conf
 
 	@touch $@
 

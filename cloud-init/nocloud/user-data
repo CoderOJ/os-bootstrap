@@ -20,7 +20,6 @@ packages:
   - fish
   - zsh
   - systemd-timesyncd
-  - systemd-boot
   - build-essential
   - git
   - sssd

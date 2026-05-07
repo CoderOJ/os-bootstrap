@@ -28,7 +28,7 @@ make target/all DISK=/dev/sdX DEBIAN_VERSION=bookworm
 
 - **GPT 分区**：EFI 系统分区 (1GB) + Btrfs 根分区
 - **Btrfs 文件系统**：优化的子卷布局（`/home`, `/var`, `/opt` 等）
-- **systemd-boot**：现代 UEFI 引导加载器
+- **systemd-boot**：现代 UEFI 引导加载器，使用 `kernel-install` 自动维护内核启动项
 - **cloud-init**：自动化初始系统配置
 - **辅助脚本**：NVIDIA 驱动、mDNS、LDAP 客户端配置
 
@@ -36,7 +36,7 @@ make target/all DISK=/dev/sdX DEBIAN_VERSION=bookworm
 
 - **APT 镜像源**：使用清华大学镜像（`apt/sources.list.template`）
 - **cloud-init**：NoCloud 数据源配置（`cloud-init/nocloud/`）
-- **systemd-boot**：引导加载器配置（`systemd-boot/loader/`）
+- **systemd-boot**：引导加载器配置（`systemd-boot/loader/`），内核条目由目标系统的 `kernel-install` 生成
 
 ## 辅助脚本
 
@@ -62,7 +62,7 @@ make target/format DISK=/dev/sdX
 # 3. 创建 Btrfs 子卷
 make target/subvolume DISK=/dev/sdX
 
-# 4. 引导系统并安装引导加载器
+# 4. 引导系统并安装引导加载器、生成初始内核启动项
 make target/bootstrap DISK=/dev/sdX
 make target/systemd-boot DISK=/dev/sdX
 ```
@@ -96,7 +96,7 @@ make clean
 ├── apt/                          # APT 配置
 ├── cloud-init/                   # cloud-init 配置
 ├── scripts/                      # 安装后配置脚本
-└── systemd-boot/                 # 引导加载器配置
+└── systemd-boot/                 # 引导加载器配置和安装辅助脚本
 ```
 
 ## 故障排查
