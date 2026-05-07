@@ -1,3 +1,5 @@
+SHELL := /bin/bash
+
 DEBIAN_VERSION ?= trixie
 
 clean:
@@ -122,6 +124,16 @@ target/systemd-boot: target/bootstrap
 
 target/all: target/bootstrap target/systemd-boot
 	@touch $@
+
+config/set-cscg-password:
+	# Keep the password out of shell history, hash it as SHA-512 crypt,
+	# then replace only the cloud-init passwd line tagged with the marker.
+	# The hash is passed through ENV so Perl does not treat "$$6$$..." as captures.
+	@read -rsp "New password for cscg: " password; echo; \
+	test "$$password" != "" || { echo "Password cannot be empty"; exit 1; }; \
+	command -v openssl >/dev/null || { echo "openssl is required"; exit 1; }; \
+	hash="$$(printf '%s' "$$password" | openssl passwd -6 -stdin)"; \
+	HASH="$$hash" perl -0pi -e 's/^(\s*passwd:\s*)".*?"(\s*# id\.set_password_here)$$/$$1 . "\"" . $$ENV{HASH} . "\"" . $$2/me or die "Password marker not found\n"' cloud-init/nocloud/user-data
 
 test/boot: target/dependency
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
