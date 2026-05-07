@@ -120,7 +120,10 @@ target/systemd-boot: target/format
 	cp systemd-boot/loader/loader.conf mnt/boot/loader/loader.conf
 	DEBIAN_VERSION=${DEBIAN_VERSION} bash systemd-boot/loader/entries/debian.conf.sh > mnt/boot/loader/entries/debian.conf
 
+	@touch $@
+
 target/all: target/bootstrap target/systemd-boot
+	@touch $@
 
 test/boot: target/dependency
 	@test "${DISK}" != "" || (echo "Specify DISK=/dev/..."; exit 1)
@@ -131,7 +134,7 @@ test/boot: target/dependency
 	mkdir -p qemu-run
 	cp /usr/share/OVMF/OVMF_VARS_4M.fd ./qemu-run/OVMF_VARS_4M.fd
 	qemu-system-x86_64 -nographic -m 4g -smp 8 \
-		  -drive if=pflash,format=raw,readonly,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
+		  -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
 		  -drive if=pflash,format=raw,file=./qemu-run/OVMF_VARS_4M.fd \
 		  -drive file=${DISK},format=raw,if=none,id=disk0,cache=directsync \
 		  -netdev user,id=net0 \
