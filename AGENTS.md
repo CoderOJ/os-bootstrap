@@ -1,0 +1,45 @@
+# Repository Guidelines
+
+This repository bootstraps Debian systems onto a target disk. Treat it as infrastructure code with destructive side effects: partitioning and formatting targets erase data.
+
+## Project Layout
+
+- `Makefile` is the main entry point. The default Debian release is `trixie` via `DEBIAN_VERSION ?= trixie`.
+- `apt/sources.list.template` defines Debian APT mirrors and release placeholders.
+- `cloud-init/nocloud/` contains NoCloud seed files copied into the installed system.
+- `cloud-init/99-local.cfg` configures cloud-init datasource and network rendering.
+- `systemd-boot/loader/` contains systemd-boot loader config and the generated Debian entry script.
+- `scripts/` contains post-install helper scripts copied to `/home/cscg/scripts/`.
+- `mnt/`, `target/`, and `qemu-run/` are local build/runtime outputs. Do not treat them as source.
+
+## Common Commands
+
+- Full install: `make target/all DISK=/dev/sdX`
+- Full install with another Debian release: `make target/all DISK=/dev/sdX DEBIAN_VERSION=bookworm`
+- Step install: `make target/partition-disk`, `make target/format`, `make target/subvolume`, `make target/bootstrap`, `make target/systemd-boot`
+- Mount helpers: `make util/mount DISK=/dev/sdX`, `make util/unmount`, `make util/mount-kernelfs`, `make util/unmount-kernelfs`
+- QEMU boot test: `make test/boot DISK=/dev/sdX`
+- Chroot test: `make test/chroot DISK=/dev/sdX`
+- Btrfs scrub: `make test/scrub DISK=/dev/sdX`
+- Cleanup: `make clean`
+
+## Safety Rules
+
+- Do not run `make target/partition-disk`, `make target/format`, `make target/all`, or any command using a real `DISK=/dev/...` unless the user explicitly asks for it and the target disk is clear.
+- Prefer inspection and static validation for routine edits. Many targets require root privileges and mutate block devices, mounts, or `/usr/share/OVMF`-based QEMU state.
+- Before changing mount or cleanup behavior, account for `mnt/` possibly containing active bind mounts for `/dev`, `/proc`, and `/sys`.
+- Preserve user-local changes. This repo may contain root-owned generated directories and a dirty working tree after installs or tests.
+
+## Implementation Notes
+
+- Keep shell scripts POSIX/Bash-compatible with their current style. Existing helper scripts use Bash strict mode (`set -euo pipefail` or similar) and direct system configuration.
+- Keep Makefile commands explicit and easy to audit; avoid hiding destructive behavior behind broad aggregate targets.
+- When editing cloud-init YAML, preserve indentation and validate that `#cloud-config` remains the first line of `user-data`.
+- When editing boot config generation, remember `systemd-boot/loader/entries/debian.conf.sh` is run from the repository root and reads symlinks under `./mnt`.
+- Avoid committing generated files from `mnt/`, `target/`, or `qemu-run/`.
+
+## Verification
+
+- For non-destructive changes, use static checks such as `bash -n scripts/*.sh systemd-boot/loader/entries/debian.conf.sh`.
+- For Makefile changes, prefer `make -n <target>` with a disposable or clearly specified `DISK` when possible.
+- End-to-end verification normally requires a disposable block device or disk image and may need root privileges.
